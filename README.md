@@ -1,66 +1,71 @@
-# F&B Order Management (Python)
+# F&B Order Management
 
-Dự án quản lý đơn hàng/bàn ăn F&B đơn giản, phù hợp với nhóm 4 người mới bắt đầu lập trình.
+Ứng dụng dòng lệnh quản lý thực đơn, bàn ăn, đơn hàng, hàng đợi bếp và hóa đơn. Dự án phù hợp để thực hành OOP, cấu trúc dữ liệu và kiểm thử Python.
 
 ## Cấu trúc thư mục
+
 ```text
 fnb-order-management/
-├── README.md
-├── main.py
-├── models/
-│   ├── menu_item.py
-│   ├── order.py
-│   ├── dining_table.py
-│   └── invoice.py
-├── data_structures/
-│   ├── queue.py
-│   └── hash_map.py
-├── services/
-│   ├── menu_service.py
-│   ├── order_service.py
-│   ├── kitchen_service.py
-│   └── billing_service.py
-├── tests/
-│   ├── test_queue.py
-│   ├── test_hash_map.py
-│   ├── test_orders.py
-│   └── test_billing.py
 ├── data/
-│   └── menu_sample.csv
+│   └── menu_sample.json
+├── src/
+│   ├── __init__.py
+│   ├── app.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── dining_table.py
+│   │   ├── invoice.py
+│   │   ├── menu_item.py
+│   │   └── order.py
+│   └── core/
+│       ├── __init__.py
+│       ├── storage.py
+│       ├── data_structures/
+│       │   ├── __init__.py
+│       │   ├── hash_map.py
+│       │   └── queue.py
+│       └── services/
+│           ├── __init__.py
+│           ├── billing_service.py
+│           ├── kitchen_service.py
+│           ├── menu_service.py
+│           └── order_service.py
+├── tests/
+├── .gitignore
+├── pyproject.toml
 ├── requirements.txt
-└── .gitignore
+└── README.md
 ```
 
-## Vai trò thư mục
-- `models/`: các đối tượng dữ liệu món ăn, đơn hàng, bàn và hóa đơn.
-- `data_structures/`: Queue (hàng đợi) và Hash Map (bảng băm).
-- `services/`: nghiệp vụ thực đơn, đơn hàng, bếp và thanh toán.
-- `tests/`: kiểm thử các chức năng quan trọng.
-- `data/`: dữ liệu thực đơn mẫu.
+## Phân công gợi ý
 
-## Chức năng chính
-1. Quản lý thực đơn và tra cứu món theo mã.
-2. Tạo đơn hàng, thêm món và gắn với bàn.
-3. Đưa món vào Queue để bếp xử lý theo nguyên tắc FIFO (vào trước, xử lý trước).
-4. Theo dõi trạng thái bàn.
-5. Tính tổng hóa đơn.
+- Thành viên 1: model thực đơn, bàn ăn và dữ liệu mẫu.
+- Thành viên 2: cấu trúc dữ liệu Queue và Hash Map.
+- Thành viên 3: nghiệp vụ thực đơn, đơn hàng và bếp.
+- Thành viên 4: hóa đơn, kiểm thử tích hợp và demo.
 
-## Trình tự triển khai
-1. Thống nhất cấu trúc dữ liệu và cách gọi hàm giữa các thành viên.
-2. Hoàn thiện, kiểm thử Queue và Hash Map.
-3. Hoàn thiện model và thực đơn mẫu.
-4. Kết nối tạo đơn hàng với hàng đợi bếp.
-5. Tính hóa đơn và cập nhật trạng thái bàn.
-6. Chạy thử toàn bộ luồng và chuẩn bị demo.
+## Cài đặt và chạy
 
-## Lưu ý
-- Đây là bộ khung khởi đầu; các thành viên cần hoàn thiện logic và kiểm thử.
-- Nếu môn học yêu cầu tự cài đặt cấu trúc dữ liệu, hãy tự triển khai Hash Map thay vì chỉ bọc `dict` có sẵn.
-- Mỗi lần chỉ làm một chức năng nhỏ, chạy thử trước khi tích hợp.
+Cần cài Python 3.10 trở lên và [uv](https://docs.astral.sh/uv/).
 
-## Tiêu chí MVP
-- Tra cứu được món bằng mã.
-- Tạo được đơn hàng và thêm món.
-- Queue lấy món ra đúng thứ tự FIFO.
-- Tính được tổng hóa đơn chính xác.
-- Có kiểm thử cơ bản và demo được quy trình từ gọi món đến thanh toán.
+```powershell
+uv sync
+uv run python -m src.app
+```
+
+Chạy kiểm thử:
+
+```powershell
+uv run pytest
+```
+
+Có thể cài dependency kiểm thử bằng `python -m pip install -r requirements.txt` nếu không dùng uv.
+
+## Chức năng dự kiến
+
+- Quản lý thực đơn và tra cứu món theo mã.
+- Tạo đơn hàng, thêm món và gắn với bàn.
+- Đưa món vào hàng đợi bếp theo FIFO.
+- Theo dõi trạng thái bàn và tính tổng hóa đơn.
+
+Đây là bộ khung khởi đầu; các thành viên có thể hoàn thiện nghiệp vụ và kiểm thử theo phân công.

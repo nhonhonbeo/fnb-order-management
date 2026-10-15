@@ -1,0 +1,16 @@
+[{
+        "item_id": "F001",
+        "name": "Phở bò",
+        "price": 45000
+    },
+    {
+        "item_id": "F002",
+        "name": "Bánh mì",
+        "price": 25000
+    },
+    {
+        "item_id": "F003",
+        "name": "Trà tắc",
+        "price": 15000
+    }
+]
