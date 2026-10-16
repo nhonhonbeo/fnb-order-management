@@ -1,0 +1,90 @@
+"""Trang theo dõi doanh thu và đơn hàng gần đây."""
+from collections import Counter
+from datetime import datetime
+from html import escape
+
+import streamlit as st
+
+from ui.state import currency, order_total
+from ui.styles import inject_css
+
+
+STATUS = {
+    "NEW": ("Mới", "new"),
+    "COOKING": ("Đang nấu", "cooking"),
+    "READY": ("Đã phục vụ", "ready"),
+    "PAID": ("Đã thanh toán", "paid"),
+}
+
+
+def _order_time(order):
+    return datetime.fromisoformat(order["created_at"]).strftime("%H:%M") if order.get("created_at") else "—"
+
+
+def _render_order_card(order):
+    status, style = STATUS.get(order["status"], (order["status"], "new"))
+    values = [
+        ("Mã đơn", order["id"]),
+        ("Bàn", order["table"]),
+        ("Số món", sum(item["quantity"] for item in order["items"])),
+        ("Tổng tiền", currency(order_total(order))),
+        ("Thời gian", _order_time(order)),
+    ]
+    fields = "".join(
+        f'<div><div class="order-card__label">{label}</div><div class="order-card__value">{escape(str(value))}</div></div>'
+        for label, value in values
+    )
+    st.markdown(
+        f'<div class="order-card">{fields}<span class="status-badge status-badge--{style}">{status}</span></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_best_sellers(orders):
+    counts = Counter(item["name"] for order in orders for item in order["items"] for _ in range(item["quantity"]))
+    if not counts:
+        st.caption("Chưa có dữ liệu món bán.")
+        return
+    maximum = max(counts.values())
+    for rank, (name, quantity) in enumerate(counts.most_common(5), start=1):
+        width = max(8, round(quantity / maximum * 100))
+        st.markdown(
+            f'''<div class="best-seller"><div class="best-seller__line"><span>{rank}. {escape(name)}</span><span>{quantity} món</span></div>
+            <div class="best-seller__bar"><div class="best-seller__fill" style="width:{width}%"></div></div></div>''',
+            unsafe_allow_html=True,
+        )
+
+
+def _render_hourly_revenue(orders):
+    revenue_by_hour = {f"{hour:02d}:00": 0 for hour in range(9, 19)}
+    for order in orders:
+        if order.get("created_at"):
+            key = f"{datetime.fromisoformat(order['created_at']).hour:02d}:00"
+            if key in revenue_by_hour:
+                revenue_by_hour[key] += order_total(order)
+    st.bar_chart({"Giờ": list(revenue_by_hour), "Doanh thu": list(revenue_by_hour.values())}, x="Giờ", y="Doanh thu", color="#E8590C", height=210)
+
+
+def render():
+    inject_css()
+    st.title("Báo cáo doanh thu")
+    st.caption("Theo dõi doanh thu, đơn hàng và món bán chạy trong phiên hiện tại")
+    orders = st.session_state.orders
+    revenue = sum(invoice["total"] for invoice in st.session_state.invoices)
+    col1, col2 = st.columns(2)
+    col1.metric("Doanh thu", currency(revenue))
+    col2.metric("Tổng đơn hàng", len(orders))
+
+    st.subheader("Đơn hàng gần đây")
+    if not orders:
+        st.info("Chưa có đơn hàng để báo cáo.")
+        return
+    recent_column, insights_column = st.columns([2, 1], gap="large")
+    with recent_column:
+        for order in reversed(orders[-5:]):
+            _render_order_card(order)
+    with insights_column:
+        st.markdown("#### Món bán chạy hôm nay")
+        _render_best_sellers(orders)
+        st.markdown("#### Doanh thu theo giờ")
+        _render_hourly_revenue(orders)
