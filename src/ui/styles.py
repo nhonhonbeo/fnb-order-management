@@ -260,6 +260,161 @@ def inject_css():
         [data-testid="stSidebar"] {
             background: #FFFFFF;
         }
+
+        /* ===== Authentication UI Styles ===== */
+        .auth-container {
+            max-width: 480px;
+            margin: 1.5rem auto 2.5rem auto;
+            padding: 0 0.5rem;
+        }
+        .auth-brand {
+            text-align: center;
+            margin-bottom: 1.75rem;
+        }
+        .auth-brand__logo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, #FF922B, #E8590C);
+            border-radius: 22px;
+            font-size: 36px;
+            box-shadow: 0 10px 25px rgba(232, 89, 12, 0.28);
+            margin-bottom: 0.75rem;
+            animation: authLogoFloat 3s ease-in-out infinite;
+        }
+        @keyframes authLogoFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .auth-brand__title {
+            font-size: 26px;
+            font-weight: 800;
+            color: #1A1A1A;
+            letter-spacing: -0.03em;
+            margin: 0;
+        }
+        .auth-brand__subtitle {
+            font-size: 14px;
+            color: #6B7280;
+            margin-top: 6px;
+        }
+        .auth-card-box {
+            background: #FFFFFF;
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.07), 0 2px 6px rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(230, 230, 230, 0.8);
+        }
+        .auth-demo-section {
+            background: #F8F9FA;
+            border: 1px dashed #D0D5DD;
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-top: 18px;
+        }
+        .auth-demo-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #495057;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .auth-demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .demo-chip {
+            background: #FFFFFF;
+            border: 1px solid #E9ECEF;
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: 12px;
+            color: #495057;
+        }
+        .demo-chip strong {
+            color: #1A1A1A;
+            display: block;
+        }
+
+        /* ===== Sidebar User Profile Styles ===== */
+        .sidebar-user-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: #F8F9FA;
+            border: 1px solid #E9ECEF;
+            border-radius: 14px;
+            margin-bottom: 16px;
+        }
+        .sidebar-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #E8590C, #FD7E14);
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(232, 89, 12, 0.25);
+        }
+        .sidebar-user-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .sidebar-user-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1A1A1A;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sidebar-role-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 3px;
+        }
+        .role--manager {
+            background: #FFF4E6;
+            color: #D9480F;
+            border: 1px solid #FFD8A8;
+        }
+        .role--staff {
+            background: #EBFBEE;
+            color: #2B8A3E;
+            border: 1px solid #B2F2BB;
+        }
+        .role--cashier {
+            background: #E7F5FF;
+            color: #1971C2;
+            border: 1px solid #A5D8FF;
+        }
+        .role--chef {
+            background: #F3F0FF;
+            color: #6741D9;
+            border: 1px solid #D0BFFF;
+        }
+        .role--default {
+            background: #F1F3F5;
+            color: #495057;
+            border: 1px solid #DEE2E6;
+        }
         </style>
         """,
         unsafe_allow_html=True,
