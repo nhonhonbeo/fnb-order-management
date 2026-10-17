@@ -1,6 +1,9 @@
 """Mô hình dữ liệu THANH TOÁN """
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict
 
 # Định nghĩa các trạng thái thanh toán
 class PaymentStatus(Enum):
@@ -15,3 +18,31 @@ class Payment:
     order_id: str           # Mã đơn hàng tương ứng
     amount: float           # Tổng số tiền thanh toán
     status: PaymentStatus   # Trạng thái thanh toán (PENDING hoặc SUCCESS)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "payment_id": self.payment_id,
+            "order_id": self.order_id,
+            "amount": self.amount,
+            "status": self.status.value if isinstance(self.status, PaymentStatus) else str(self.status),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Payment:
+        raw_status = data.get("status", PaymentStatus.SUCCESS)
+        if isinstance(raw_status, str):
+            try:
+                status = PaymentStatus(raw_status)
+            except ValueError:
+                status = PaymentStatus.SUCCESS
+        elif isinstance(raw_status, PaymentStatus):
+            status = raw_status
+        else:
+            status = PaymentStatus.SUCCESS
+
+        return cls(
+            payment_id=str(data.get("payment_id", "")),
+            order_id=str(data.get("order_id", "")),
+            amount=float(data.get("amount", 0.0)),
+            status=status,
+        )

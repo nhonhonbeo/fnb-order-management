@@ -1,5 +1,11 @@
 from typing import Container, Dict, List, Optional
-from models.menu_item import MenuItem
+try:
+    from src.models.menu_item import MenuItem
+except ImportError:
+    try:
+        from models.menu_item import MenuItem
+    except ImportError:
+        from feature.menu_item import MenuItem
 
 
 class DuplicateCodeError(Exception):
