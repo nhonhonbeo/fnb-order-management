@@ -3,6 +3,9 @@ from dataclasses import dataclass
 from collections import deque
 from typing import List
 
+class EmptyQueueError(Exception):
+    pass
+
 @dataclass
 class KitchenRequest:
     order_id: str      # Mã của đơn hàng chứa món này
@@ -10,6 +13,10 @@ class KitchenRequest:
     item_name: str     # Tên món ăn
     quantity: int      # Số lượng món cần nấu
 
+    #Kiểm tra với số 0
+    def __pos_int__(self):
+        if self.quantity <= 0:
+            raise ValueError("Số lượng món ăn (quantity) phải lớn hơn 0.") 
 class OrderQueue:
     def __init__(self):
         self._items = deque()
