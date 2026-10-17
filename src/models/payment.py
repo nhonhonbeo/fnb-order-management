@@ -1,53 +1,37 @@
-"""Queue FIFO khởi đầu; có thể tối ưu thêm khi học cấu trúc dữ liệu."""
+from __future__ import annotations
+
 from dataclasses import dataclass
-from collections import deque
-from typing import List
+from decimal import Decimal
+from enum import Enum
 
-@dataclass
-class KitchenRequest:
-    order_id: str      # Mã của đơn hàng chứa món này
-    item_code: str     # Mã món ăn
-    item_name: str     # Tên món ăn
-    quantity: int      # Số lượng món cần nấu
+#Trạng thái thanh toán, đang xử lý hoặc thành công(chưa có thất bại)
+class PaymentStatus(Enum):
 
-class OrderQueue:
-    def __init__(self):
-        self._items = deque()
+    PENDING = "PENDING"
+    SUCCESS = "SUCCESS"
 
-    # Thêm yêu cầu chế biến vào cuối 
-    def enqueue(self, request: KitchenRequest) -> None:
-        self._items.append(request)
 
-    # Lấy món cần chế biến ở đầu hàng
-    def dequeue(self) -> KitchenRequest:
-        if self.is_empty():
-            raise EmptyQueueError("Hàng đợi trống")
-        return self._items.popleft() #O(1) | list.pop(0) -> O(n)
+@dataclass(frozen=True)
+class Payment:
+    """
+        payment_id: Mã thanh toán duy nhất, do PaymentService sinh.
+        order_id:   Mã đơn hàng được thanh toán.
+        amount:     Số tiền đã thu, kiểu Decimal.
+        status:     Trạng thái thanh toán, mặc định là PENDING.
+    """
 
-    # Xem phần tử đầu & Ko lấy ra
-    def peek(self) -> KitchenRequest:
-        if self.is_empty():
-            raise EmptyQueueError("Hàng đợi trống")
-        return self._items[0]
+    payment_id: str
+    order_id: str
+    amount: Decimal
+    status: PaymentStatus = PaymentStatus.PENDING
 
-    # Kiểm tra độ dài
-    def is_empty(self) -> bool:
-        return len(self._items) == 0
+    def is_successful(self) -> bool:
+        #Trả về True nếu bản ghi này đã thanh toán thành công
+        return self.status is PaymentStatus.SUCCESS
 
-    # Trả về độ dài
-    def size(self) -> int:
-        return len(self._items)
-
-    # Trả về một BẢN SAO dạng danh sách (list) 
-    def list_requests(self) -> List[KitchenRequest]:
-        return list(self._items)
-
-    #Gỡ các yêu cầu chưa xử lý thuộc đơn hàng bị hủy mà vẫn giữ nguyên tuyệt đối thứ tự FIFO của các đơn hàng khác.
-    def remove_by_order(self, order_id: str) -> None:
-        new_items = deque()
-        for x in self._items:
-            # Chỉ giữ lại những yêu cầu KHÔNG KHỚP với order_id bị hủy
-            if x.order_id != order_id:
-                new_items.append(x)
-        # Gán lại hàng đợi mới sau khi đã lọc bỏ đơn bị hủy
-        self._items = new_items
+    def __str__(self) -> str:
+        #Biểu diễn chuỗi dễ đọc, dùng khi print hoặc string
+        return (
+            f"Payment({self.payment_id} | đơn {self.order_id} | "
+            f"{self.amount} | {self.status.value})"
+        )
