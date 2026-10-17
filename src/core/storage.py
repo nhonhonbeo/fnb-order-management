@@ -167,7 +167,7 @@ class StorageManager:
                 serialized.append({
                     "payment_id": getattr(p, "payment_id", ""),
                     "order_id": getattr(p, "order_id", ""),
-                    "amount": getattr(p, "amount", 0.0),
+                    "amount": getattr(p, "amount", 0),
                     "status": getattr(p.status, "value", str(getattr(p, "status", "SUCCESS"))),
                 })
         self.payments_storage.save(serialized)

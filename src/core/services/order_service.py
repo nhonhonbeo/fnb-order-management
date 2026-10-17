@@ -1,10 +1,9 @@
 """Nghiệp vụ đơn hàng."""
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from src.core.storage import JsonStorage
+from src.core.order_repository import OrderRepository
 from src.models.order import Order
 
 
@@ -17,16 +16,7 @@ class OrderService:
     ):
         self.menu = menu
         self.queue = queue
-
-        if storage_or_path is None:
-            default_path = Path(__file__).resolve().parents[3] / "data" / "orders.json"
-            self.storage: Optional[JsonStorage] = JsonStorage(default_path)
-        elif isinstance(storage_or_path, (str, Path)):
-            self.storage = JsonStorage(storage_or_path)
-        elif hasattr(storage_or_path, "load") and hasattr(storage_or_path, "save"):
-            self.storage = storage_or_path
-        else:
-            self.storage = None
+        self.repository = OrderRepository(storage_or_path)
 
         # Lưu tất cả đơn hàng vào dictionary
         self.orders: Dict[str, Order] = {}
@@ -35,17 +25,7 @@ class OrderService:
 
     def load(self) -> None:
         """Đọc danh sách đơn hàng từ storage vào bộ nhớ."""
-        if self.storage is None:
-            return
-
-        raw_orders = self.storage.load(default=[])
-        self.orders = {}
-        for item in raw_orders:
-            if isinstance(item, Order):
-                self.orders[item.order_id] = item
-            elif isinstance(item, dict):
-                order = Order.from_dict(item)
-                self.orders[order.order_id] = order
+        self.orders = {order.order_id: order for order in self.repository.load()}
 
         max_no = 0
         for oid in self.orders.keys():
@@ -55,9 +35,7 @@ class OrderService:
 
     def save(self) -> None:
         """Lưu toàn bộ danh sách đơn hàng ra storage."""
-        if self.storage is not None:
-            serialized = [order.to_dict() for order in self.orders.values()]
-            self.storage.save(serialized)
+        self.repository.save(self.orders.values())
 
     def create_order(self, table_id: Any = None, order_id: Optional[str] = None) -> Order:
         if isinstance(table_id, Order):

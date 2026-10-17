@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from src.core.storage import JsonStorage
 from src.models.invoice import Invoice
+from src.money import to_vnd
 
 
 class BillingService:
@@ -43,26 +44,26 @@ class BillingService:
             serialized = [inv.to_dict() for inv in self._invoices]
             self.storage.save(serialized)
 
-    def calculate_total(self, order_or_items: Any) -> float:
+    def calculate_total(self, order_or_items: Any) -> int:
         """Tính tổng số tiền của đơn hàng hoặc danh sách món ăn."""
         if hasattr(order_or_items, "total"):
-            return float(order_or_items.total())
+            return to_vnd(order_or_items.total())
 
         if isinstance(order_or_items, dict):
             if "total" in order_or_items:
-                return float(order_or_items["total"])
+                return to_vnd(order_or_items["total"])
             if "items" in order_or_items:
                 return self.calculate_total(order_or_items["items"])
 
-        total = 0.0
+        total = 0
         if isinstance(order_or_items, list):
             for item in order_or_items:
                 if hasattr(item, "subtotal"):
-                    total += float(item.subtotal())
+                    total += to_vnd(item.subtotal())
                 elif isinstance(item, dict):
                     price = item.get("unit_price") or item.get("price", 0)
                     qty = item.get("quantity", 1)
-                    total += float(price * qty)
+                    total += to_vnd(price) * int(qty)
         return total
 
     def create_invoice(
@@ -96,6 +97,6 @@ class BillingService:
         """Trả về toàn bộ danh sách hóa đơn đã lập."""
         return list(self._invoices)
 
-    def get_total_revenue(self) -> float:
+    def get_total_revenue(self) -> int:
         """Tính tổng doanh thu thực tế từ tất cả các hóa đơn."""
         return sum(inv.total for inv in self._invoices)

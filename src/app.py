@@ -11,7 +11,8 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from ui import auth_page, dashboard, menu_page, order_page, queue_page, revenue_page
-from ui.state import get_current_user, initialise_state, logout_user
+from ui.bootstrap import initialise_state
+from ui.state import get_current_user, logout_user
 from ui.styles import inject_css
 
 

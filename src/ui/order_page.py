@@ -3,6 +3,7 @@ from datetime import datetime
 
 from ui.state import currency, new_id, order_total, save_tables_state
 from ui.styles import inject_css
+from ui.presenters import order_views
 
 
 def _cart_total(cart):
@@ -86,18 +87,8 @@ def render():
         st.session_state.tables[table] = "Đang phục vụ"
         save_tables_state()
 
-        # 5. Cập nhật session orders và kitchen_queue
-        st.session_state.orders = order_service.list_orders()
-        for item in order.items:
-            st.session_state.kitchen_queue.append({
-                "order_id": order.order_id,
-                "table": table,
-                "name": item.item_name,
-                "item_code": item.item_code,
-                "quantity": item.quantity,
-                "price": item.unit_price,
-                "status": "NEW",
-            })
+        # 5. Cập nhật dữ liệu trình bày từ service
+        st.session_state.orders = order_views(order_service.list_orders())
 
         st.session_state.cart = []
         st.session_state.pop("selected_table", None)

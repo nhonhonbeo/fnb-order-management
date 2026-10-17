@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict
 
+from src.money import to_vnd
+
 # Định nghĩa các trạng thái thanh toán
 class PaymentStatus(Enum):
     PENDING = "PENDING"  # Đang chờ xử lý
@@ -16,8 +18,11 @@ class PaymentStatus(Enum):
 class Payment:
     payment_id: str         # Mã thanh toán
     order_id: str           # Mã đơn hàng tương ứng
-    amount: float           # Tổng số tiền thanh toán
+    amount: int             # Tổng số tiền thanh toán theo đồng nguyên
     status: PaymentStatus   # Trạng thái thanh toán (PENDING hoặc SUCCESS)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "amount", to_vnd(self.amount))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -43,6 +48,6 @@ class Payment:
         return cls(
             payment_id=str(data.get("payment_id", "")),
             order_id=str(data.get("order_id", "")),
-            amount=float(data.get("amount", 0.0)),
+            amount=data.get("amount", 0),
             status=status,
         )

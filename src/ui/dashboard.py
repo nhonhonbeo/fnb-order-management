@@ -158,9 +158,9 @@ def _format_dashboard_datetime(now):
 def _dashboard_alerts(orders):
     now = datetime.now()
     waiting_order_ids = {
-        item["order_id"]
-        for item in st.session_state.kitchen_queue
-        if item["status"] in {"NEW", "COOKING"}
+        request.order_id
+        for request in st.session_state.kitchen_service.list_requests()
+        if request.status in {"NEW", "COOKING"}
     }
     delayed_items = 0
     long_seated_tables = 0

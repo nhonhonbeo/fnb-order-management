@@ -52,6 +52,12 @@ class Queue:
     """Trả về số lượng phần tử hiện có trong hàng đợi"""
     return self._size
 
+  def __iter__(self):
+    current = self.front
+    while current is not None:
+      yield current.data
+      current = current.next
+
   def display(self):
     """In ra các phần tử trong hàng đợi từ đầu đến cuối (hữu ích để debug)"""
     if self.is_empty():

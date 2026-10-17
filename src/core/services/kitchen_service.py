@@ -43,6 +43,18 @@ class KitchenService:
         if hasattr(self.kitchen_queue, "remove_by_order"):
             self.kitchen_queue.remove_by_order(order_id)
 
+    def update_status(self, order_id: str, item_code: str, status: str) -> None:
+        """Cập nhật tiến độ chế biến của một yêu cầu trong hàng đợi."""
+        if status not in {"NEW", "COOKING", "READY", "DONE"}:
+            raise ValueError(f"Trạng thái món không hợp lệ: {status}")
+
+        for request in self.list_requests():
+            if request.order_id == order_id and request.item_code == item_code:
+                request.status = status
+                return
+
+        raise ValueError("Không tìm thấy món trong hàng đợi bếp")
+
     def is_empty(self) -> bool:
         """Kiểm tra bếp có đang rảnh (hàng đợi trống) hay không."""
         if hasattr(self.kitchen_queue, "is_empty"):

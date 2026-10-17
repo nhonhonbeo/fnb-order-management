@@ -2,6 +2,7 @@ import pytest
 
 from src.core.data_structures.queue import Queue
 from src.core.order_queue import EmptyQueueError, KitchenRequest, OrderQueue
+from src.core.services.kitchen_service import KitchenService
 
 
 def test_custom_linked_list_queue():
@@ -49,3 +50,18 @@ def test_order_queue_fifo_and_cancellation():
 
     with pytest.raises(EmptyQueueError):
         oq.dequeue()
+
+
+def test_kitchen_service_updates_request_status():
+    queue = OrderQueue()
+    service = KitchenService(queue)
+    request = KitchenRequest("DH001", "F001", "Phở bò", 2)
+
+    service.send_to_kitchen(request)
+    service.update_status("DH001", "F001", "COOKING")
+
+    assert service.list_requests() == [request]
+    assert service.list_requests()[0].status == "COOKING"
+
+    with pytest.raises(ValueError, match="không hợp lệ"):
+        service.update_status("DH001", "F001", "INVALID")

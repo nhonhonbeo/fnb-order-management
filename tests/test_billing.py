@@ -4,6 +4,9 @@ from src.core.payment_service import PaymentError, PaymentService
 from src.core.services.billing_service import BillingService
 from src.core.services.menu_service import MenuService
 from src.core.services.order_service import OrderService
+from src.models.invoice import Invoice
+from src.models.order import Order
+from src.models.payment import Payment
 from src.models.payment import PaymentStatus
 
 
@@ -18,12 +21,14 @@ def test_billing_calculation_and_invoicing(tmp_path):
     ]
     total = billing_service.calculate_total(items)
     assert total == 45000 * 2 + 25000 * 1 + 15000 * 3  # 160000
+    assert isinstance(total, int)
 
     invoice = billing_service.create_invoice(
         order={"order_id": "DH001", "table_id": "Bàn 1", "total": total},
         payment_id="TT001",
     )
     assert invoice.total == 160000
+    assert isinstance(invoice.total, int)
     assert invoice.order_id == "DH001"
     assert invoice.payment_id == "TT001"
     assert billing_service.get_total_revenue() == 160000
@@ -52,9 +57,13 @@ def test_payment_service_workflow(tmp_path):
     with pytest.raises(PaymentError):
         payment_service.pay(order.order_id, amount=90000)
 
+    with pytest.raises(PaymentError):
+        payment_service.pay(order.order_id, amount=100000.5)
+
     # 2. Thanh toán đúng số tiền
     payment = payment_service.pay(order.order_id, amount=100000)
     assert payment.payment_id == "TT001"
+    assert isinstance(payment.amount, int)
     assert payment.status == PaymentStatus.SUCCESS
     assert order.status == "PAID"
 
@@ -69,3 +78,26 @@ def test_payment_service_workflow(tmp_path):
     )
     assert len(reloaded_payments.list_payments()) == 1
     assert reloaded_payments.list_payments()[0].payment_id == "TT001"
+
+
+def test_legacy_decimal_money_values_are_normalized_to_integer_vnd():
+    order = Order.from_dict({
+        "order_id": "DH001",
+        "items": [{
+            "item_code": "F001",
+            "item_name": "Phở bò",
+            "quantity": 1,
+            "unit_price": 45000.0,
+        }],
+    })
+    invoice = Invoice.from_dict({"order_id": "DH001", "total": 45000.0})
+    payment = Payment.from_dict({
+        "payment_id": "TT001",
+        "order_id": "DH001",
+        "amount": 45000.0,
+    })
+
+    assert order.total() == 45000
+    assert isinstance(order.total(), int)
+    assert isinstance(invoice.total, int)
+    assert isinstance(payment.amount, int)

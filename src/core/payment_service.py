@@ -6,6 +6,7 @@ from typing import Any, List, Optional
 
 from src.core.storage import JsonStorage
 from src.models.payment import Payment, PaymentStatus
+from src.money import to_whole_vnd
 
 
 class PaymentError(Exception):
@@ -72,11 +73,11 @@ class PaymentService:
             self.storage.save(serialized)
 
     # Hàm tính tổng tiền cần thu
-    def calculate_amount(self, order) -> float:
+    def calculate_amount(self, order) -> int:
         return order.total()
 
     # Hàm thực hiện thanh toán cho một đơn hàng
-    def pay(self, order_id: str, amount: float) -> Payment:
+    def pay(self, order_id: str, amount: int) -> Payment:
         # 1. Tìm đơn hàng qua order_service
         try:
             order = self._order_service.get_order(order_id)
@@ -95,6 +96,11 @@ class PaymentService:
         
         # Kiểm tra tiền khách đưa có bằng đúng tổng hóa đơn không
         ac_amount = self.calculate_amount(order)
+        try:
+            amount = to_whole_vnd(amount)
+        except ValueError as error:
+            raise PaymentError("Số tiền thanh toán không hợp lệ") from error
+
         if amount != ac_amount:
             raise PaymentError("Số tiền phải đúng bằng tổng hóa đơn")
 

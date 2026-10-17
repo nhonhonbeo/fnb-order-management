@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from src.money import to_vnd
+
 
 class MenuItem:
     """Đại diện cho một món ăn trong thực đơn.
@@ -22,7 +24,7 @@ class MenuItem:
         raw_code = item_id if item_id is not None else code
         self.code: str = str(raw_code).strip().upper() if raw_code else ""
         self.name: str = str(name).strip() if name else ""
-        self.price: int = int(price)
+        self.price: int = to_vnd(price)
         self.is_active: bool = bool(is_active)
 
         self._validate()
@@ -36,7 +38,7 @@ class MenuItem:
     @staticmethod
     def _validate_price(price: Any) -> None:
         """Kiểm tra giá hợp lệ (phải là số nguyên > 0, loại trừ boolean)."""
-        if isinstance(price, bool) or not isinstance(price, (int, float)) or price <= 0:
+        if isinstance(price, bool) or not isinstance(price, int) or price <= 0:
             raise ValueError("Giá phải là số nguyên lớn hơn 0")
 
     @property
@@ -51,14 +53,14 @@ class MenuItem:
     def update(self, name: Optional[str] = None, price: Optional[int] = None) -> None:
         """Cập nhật tên và/hoặc đơn giá của món ăn."""
         new_name = self.name if name is None else str(name).strip()
-        new_price = self.price if price is None else price
+        new_price = self.price if price is None else to_vnd(price)
 
         if not new_name:
             raise ValueError("Mã và tên không được rỗng")
         self._validate_price(new_price)
 
         self.name = new_name
-        self.price = int(new_price)
+        self.price = new_price
 
     def deactivate(self) -> None:
         """Tạm ngừng kinh doanh món ăn."""
@@ -85,7 +87,7 @@ class MenuItem:
         return cls(
             code=code,
             name=data.get("name", ""),
-            price=int(data.get("price", 0)),
+            price=data.get("price", 0),
             is_active=bool(data.get("is_active", True)),
         )
 
@@ -107,7 +109,7 @@ class MenuItem:
         elif key == "name":
             self.name = str(value).strip()
         elif key == "price":
-            self.price = int(value)
+            self.price = to_vnd(value)
         elif key == "is_active":
             self.is_active = bool(value)
         else:

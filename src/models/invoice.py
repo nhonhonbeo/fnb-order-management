@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from src.money import to_vnd
+
 
 class Invoice:
     """Đại diện cho hóa đơn thanh toán của một đơn hàng."""
@@ -11,7 +13,7 @@ class Invoice:
     def __init__(
         self,
         order_id: str,
-        total: float,
+        total: int,
         invoice_id: Optional[str] = None,
         table_id: str = "",
         created_at: Optional[str] = None,
@@ -19,7 +21,7 @@ class Invoice:
     ):
         self.invoice_id = invoice_id or f"HD-{datetime.now().strftime('%y%m%d%H%M%S')}"
         self.order_id = str(order_id)
-        self.total = float(total)
+        self.total = to_vnd(total)
         self.table_id = str(table_id)
         self.created_at = created_at or datetime.now().isoformat()
         self.payment_id = str(payment_id)
@@ -46,7 +48,7 @@ class Invoice:
         return cls(
             invoice_id=inv_id,
             order_id=data.get("order_id", ""),
-            total=float(data.get("total", 0.0)),
+            total=data.get("total", 0),
             table_id=data.get("table_id") or data.get("table", ""),
             created_at=data.get("created_at"),
             payment_id=data.get("payment_id", ""),
@@ -73,7 +75,7 @@ class Invoice:
         elif key == "order_id":
             self.order_id = str(value)
         elif key == "total":
-            self.total = float(value)
+            self.total = to_vnd(value)
         elif key in ("table_id", "table"):
             self.table_id = str(value)
         elif key == "created_at":
