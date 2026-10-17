@@ -5,7 +5,7 @@ from html import escape
 
 import streamlit as st
 
-from ui.state import currency, order_total
+from ui.state import currency, get_current_user, order_total
 from ui.styles import inject_css
 
 
@@ -67,6 +67,12 @@ def _render_hourly_revenue(orders):
 
 def render():
     inject_css()
+    current_user = get_current_user()
+    if current_user and current_user.role not in ["Quản lý", "Thu ngân"]:
+        st.title("Báo cáo doanh thu")
+        st.warning("🔒 Bạn không có quyền truy cập trang này. Báo cáo tài chính & doanh thu chỉ dành cho **Quản lý** và **Thu ngân**.")
+        return
+
     st.title("Báo cáo doanh thu")
     st.caption("Theo dõi doanh thu, đơn hàng và món bán chạy trong phiên hiện tại")
     orders = st.session_state.orders
