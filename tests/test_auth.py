@@ -20,6 +20,7 @@ def test_auth_service_authenticate_success_and_failure(tmp_path):
     assert admin_user is not None
     assert admin_user.username == "admin"
     assert admin_user.role == "Quản lý"
+    assert service.get_user_by_username(" ADMIN ").username == "admin"
 
     wrong_pw_user = service.authenticate("admin", "wrong_pass")
     assert wrong_pw_user is None
@@ -47,6 +48,7 @@ def test_auth_service_register_new_user(tmp_path):
     authenticated = service.authenticate("lethib", "password123")
     assert authenticated is not None
     assert authenticated.full_name == "Lê Thị B"
+    assert service.get_user_by_username("LETHIB").full_name == "Lê Thị B"
 
     # Duplicate registration fails
     dup_success, dup_msg, dup_user = service.register(

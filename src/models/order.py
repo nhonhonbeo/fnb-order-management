@@ -1,6 +1,7 @@
 """Các lớp dùng để lưu thông tin đơn hàng."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from src.money import to_vnd
@@ -46,11 +47,15 @@ class Order:
         table_id: Optional[str] = None,
         status: str = "NEW",
         items: Optional[List[OrderItem]] = None,
+        created_at: Optional[str] = None,
     ):
         self.order_id = str(order_id)
         self.table_id = table_id
         self.status = status
         self.items: List[OrderItem] = items if items is not None else []
+        self.created_at: Optional[str] = (
+            created_at if created_at is not None else datetime.now().isoformat()
+        )
 
     # Hàm thêm một món ăn vào đơn hàng
     def add_line(self, item_code: str, item_name: str, quantity: int, unit_price: int):
@@ -77,6 +82,7 @@ class Order:
             "order_id": self.order_id,
             "table_id": self.table_id,
             "status": self.status,
+            "created_at": self.created_at,
             "items": [item.to_dict() for item in self.items],
         }
 
@@ -88,9 +94,13 @@ class Order:
                 items.append(it)
             elif isinstance(it, dict):
                 items.append(OrderItem.from_dict(it))
-        return cls(
+        order = cls(
             order_id=data.get("order_id", ""),
             table_id=data.get("table_id"),
             status=data.get("status", "NEW"),
             items=items,
+            created_at=data.get("created_at"),
         )
+        if data.get("created_at") is None:
+            order.created_at = None
+        return order

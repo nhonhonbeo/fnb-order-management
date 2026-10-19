@@ -1,5 +1,6 @@
 import pytest
 
+from src.core.queues.order_queue import OrderQueue
 from src.core.services.billing_service import BillingService
 from src.core.services.menu_service import MenuService
 from src.core.services.order_service import OrderService
@@ -44,7 +45,12 @@ def test_payment_service_workflow(tmp_path):
     menu_service = MenuService(data_dir / "menu.json")
     menu_service.add_item("F001", "Phở bò", 50000)
 
-    order_service = OrderService(menu=menu_service, storage_or_path=data_dir / "orders.json")
+    queue = OrderQueue()
+    order_service = OrderService(
+        menu=menu_service,
+        queue=queue,
+        storage_or_path=data_dir / "orders.json",
+    )
     order = order_service.create_order(table_id="Bàn 3")
     order_service.add_item(order.order_id, "F001", quantity=2)
 
@@ -52,6 +58,15 @@ def test_payment_service_workflow(tmp_path):
         order_service=order_service,
         storage_or_path=data_dir / "payments.json",
     )
+
+    with pytest.raises(ValueError, match="Đơn chưa chế biến xong, không thể thanh toán"):
+        payment_service.pay(order.order_id, amount=100000)
+
+    order_service.send_to_kitchen(order.order_id)
+    with pytest.raises(ValueError, match="Đơn chưa chế biến xong, không thể thanh toán"):
+        payment_service.pay(order.order_id, amount=100000)
+
+    order_service.mark_completed(order.order_id)
 
     # 1. Sai số tiền thanh toán
     with pytest.raises(PaymentError):
@@ -70,6 +85,10 @@ def test_payment_service_workflow(tmp_path):
     # 3. Thanh toán lại đơn đã PAID
     with pytest.raises(PaymentError):
         payment_service.pay(order.order_id, amount=100000)
+
+    with pytest.raises(ValueError, match="Không thể hủy đơn đã thanh toán"):
+        order_service.cancel_order(order.order_id)
+    assert order.status == "PAID"
 
     # 4. Kiểm tra lưu trữ thanh toán
     reloaded_payments = PaymentService(

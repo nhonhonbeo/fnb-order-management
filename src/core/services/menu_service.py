@@ -27,8 +27,15 @@ class MenuService:
 
     def __init__(self, storage_or_path: Optional[Any] = None):
         if storage_or_path is None:
-            default_path = Path(__file__).resolve().parents[3] / "data" / "menu_sample.json"
-            self.storage: Optional[JsonStorage] = JsonStorage(default_path)
+            data_dir = Path(__file__).resolve().parents[3] / "data"
+            self.storage = JsonStorage(data_dir / "menu.json")
+            if not self.storage.exists():
+                legacy_storage = JsonStorage(data_dir / "menu_sample.json")
+                menu_data = legacy_storage.load(default=None)
+                if menu_data is None:
+                    seed_storage = JsonStorage(data_dir / "menu_seed.json")
+                    menu_data = seed_storage.load(default=[])
+                self.storage.save(menu_data)
         elif isinstance(storage_or_path, (str, Path)):
             self.storage = JsonStorage(storage_or_path)
         elif hasattr(storage_or_path, "load") and hasattr(storage_or_path, "save"):

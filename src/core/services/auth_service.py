@@ -5,12 +5,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
 
-try:
-    from src.core.storage import JsonStorage
-    from src.models.user import User
-except ImportError:
-    from core.storage import JsonStorage
-    from models.user import User
+from src.core.data_structures.hash_table import HashTable
+from src.core.storage import JsonStorage
+from src.models.user import User
 
 
 class AuthService:
@@ -18,7 +15,14 @@ class AuthService:
         if storage_path is None:
             storage_path = Path(__file__).resolve().parents[3] / "data" / "users.json"
         self.storage = JsonStorage(storage_path)
+        self._users_by_username = HashTable()
         self._ensure_default_users()
+        self._rebuild_username_index()
+
+    def _rebuild_username_index(self) -> None:
+        """Tạo index tra cứu username không phân biệt hoa thường."""
+        for user in self.get_users():
+            self._users_by_username.insert(user.username.casefold(), user)
 
     @staticmethod
     def hash_password(password: str, salt: str | None = None) -> str:
@@ -80,10 +84,7 @@ class AuthService:
     def get_user_by_username(self, username: str) -> Optional[User]:
         """Tìm người dùng theo tên đăng nhập (không phân biệt hoa thường)."""
         clean_name = username.strip().casefold()
-        for user in self.get_users():
-            if user.username.casefold() == clean_name:
-                return user
-        return None
+        return self._users_by_username.get(clean_name)
 
     def authenticate(self, username: str, password: str) -> Optional[User]:
         """Xác thực đăng nhập tài khoản và mật khẩu."""
@@ -133,4 +134,5 @@ class AuthService:
         all_users = self.get_users()
         all_users.append(new_user)
         self.storage.save([u.to_dict() for u in all_users])
+        self._users_by_username.insert(new_user.username.casefold(), new_user)
         return True, "Đăng ký tài khoản thành công!", new_user

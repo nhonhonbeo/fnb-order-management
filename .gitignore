@@ -5,3 +5,8 @@ venv/
 .pytest_cache/
 .idea/
 .vscode/
+data/menu.json
+data/orders.json
+data/payments.json
+data/invoices.json
+data/kitchen.json

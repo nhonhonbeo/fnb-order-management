@@ -46,14 +46,6 @@ class JsonStorage:
 class StorageManager:
     """Quản lý lưu trữ tập trung cho toàn bộ dữ liệu ứng dụng F&B."""
 
-    DEFAULT_MENU = [
-        {"item_id": "F001", "name": "Phở bò", "price": 45000, "is_active": True},
-        {"item_id": "F002", "name": "Bánh mì", "price": 25000, "is_active": True},
-        {"item_id": "F003", "name": "Trà tắc", "price": 15000, "is_active": True},
-        {"item_id": "F004", "name": "Cà phê sữa", "price": 20000, "is_active": True},
-        {"item_id": "F005", "name": "Bún chả", "price": 50000, "is_active": True},
-    ]
-
     DEFAULT_TABLES = {f"Bàn {i}": "Trống" for i in range(1, 11)}
 
     def __init__(self, data_dir: str | Path | None = None):
@@ -64,20 +56,29 @@ class StorageManager:
 
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
-        self.menu_storage = JsonStorage(self.data_dir / "menu_sample.json")
+        seed_path = Path(__file__).resolve().parents[2] / "data" / "menu_seed.json"
+        self.menu_seed_storage = JsonStorage(seed_path)
+        self.menu_storage = JsonStorage(self.data_dir / "menu.json")
+        if not self.menu_storage.exists():
+            legacy_menu_storage = JsonStorage(self.data_dir / "menu_sample.json")
+            menu_data = legacy_menu_storage.load(default=None)
+            if menu_data is None:
+                menu_data = self.menu_seed_storage.load(default=[])
+            self.menu_storage.save(menu_data)
         self.users_storage = JsonStorage(self.data_dir / "users.json")
         self.orders_storage = JsonStorage(self.data_dir / "orders.json")
         self.tables_storage = JsonStorage(self.data_dir / "tables.json")
         self.invoices_storage = JsonStorage(self.data_dir / "invoices.json")
         self.payments_storage = JsonStorage(self.data_dir / "payments.json")
+        self.kitchen_storage = JsonStorage(self.data_dir / "kitchen.json")
 
     # ------------------ Menu ------------------
     def load_menu(self) -> List[Dict[str, Any]]:
         """Đọc danh sách món ăn từ storage, tự động seed dữ liệu mẫu nếu chưa có."""
         data = self.menu_storage.load(default=None)
         if data is None:
-            self.menu_storage.save(self.DEFAULT_MENU)
-            return [dict(item) for item in self.DEFAULT_MENU]
+            data = self.menu_seed_storage.load(default=[])
+            self.menu_storage.save(data)
         return data
 
     def save_menu(self, menu_items: List[Any]) -> None:

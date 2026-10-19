@@ -16,11 +16,15 @@ def test_full_fnb_order_and_payment_flow(tmp_path):
     # 1. Khởi tạo Backend Services
     menu_service = MenuService(storage_or_path=storage_manager.menu_storage)
     order_queue = OrderQueue()
-    kitchen_service = KitchenService(kitchen_queue=order_queue)
     order_service = OrderService(
         menu=menu_service,
         queue=order_queue,
         storage_or_path=storage_manager.orders_storage,
+    )
+    kitchen_service = KitchenService(
+        kitchen_queue=order_queue,
+        storage_or_path=storage_manager.kitchen_storage,
+        order_service=order_service,
     )
     billing_service = BillingService(storage_or_path=storage_manager.invoices_storage)
     payment_service = PaymentService(
@@ -29,9 +33,7 @@ def test_full_fnb_order_and_payment_flow(tmp_path):
     )
 
     # 2. Thêm món vào thực đơn và kiểm tra lưu trữ
-    item1 = menu_service.add_item("F001", "Phở bò", 45000)
-    item2 = menu_service.add_item("F002", "Bánh mì", 25000)
-    assert len(menu_service.list_items()) == 2
+    assert len(menu_service.list_items()) == 3
 
     # 3. Tạo đơn hàng gắn với Bàn 1
     tables = storage_manager.load_tables()
@@ -51,18 +53,22 @@ def test_full_fnb_order_and_payment_flow(tmp_path):
     assert order.status == "IN_PROGRESS"
     assert kitchen_service.size() == 2
 
-    # Bếp nhận món lần lượt theo FIFO
-    req1 = kitchen_service.next_item()
+    # Bếp chế biến món lần lượt theo FIFO
+    req1 = kitchen_service.current()
     assert req1.item_code == "F001"
     assert req1.quantity == 2
-    req2 = kitchen_service.next_item()
+    kitchen_service.start(order.order_id, req1.item_code)
+    kitchen_service.complete(order.order_id, req1.item_code)
+
+    req2 = kitchen_service.current()
     assert req2.item_code == "F002"
     assert req2.quantity == 1
-    assert kitchen_service.is_empty() is True
+    kitchen_service.start(order.order_id, req2.item_code)
+    kitchen_service.complete(order.order_id, req2.item_code)
 
-    # 5. Bếp hoàn thành món
-    order_service.mark_completed(order.order_id)
+    # 5. Bếp tự hoàn thành đơn khi mọi món đã sẵn sàng
     assert order.status == "COMPLETED"
+    assert kitchen_service.is_empty() is True
 
     # 6. Thu ngân thực hiện thanh toán
     payment = payment_service.pay(order.order_id, amount=expected_total)
@@ -92,7 +98,7 @@ def test_full_fnb_order_and_payment_flow(tmp_path):
     )
     reloaded_tables = reloaded_storage.load_tables()
 
-    assert len(reloaded_menu.list_items()) == 2
+    assert len(reloaded_menu.list_items()) == 3
     assert reloaded_menu.get_item("F001").name == "Phở bò"
     assert reloaded_tables["Bàn 1"] == "Trống"
 

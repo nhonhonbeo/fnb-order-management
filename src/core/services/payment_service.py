@@ -9,7 +9,7 @@ from src.models.payment import Payment, PaymentStatus
 from src.money import to_whole_vnd
 
 
-class PaymentError(Exception):
+class PaymentError(ValueError):
     """Lỗi thanh toán khi quá trình thanh toán không hợp lệ."""
 
 
@@ -87,6 +87,8 @@ class PaymentService:
             raise PaymentError("Đơn đã hủy")
         if not order.items:
             raise PaymentError("Đơn chưa có món")
+        if order.status != "COMPLETED":
+            raise PaymentError("Đơn chưa chế biến xong, không thể thanh toán")
 
         actual_amount = self.calculate_amount(order)
         try:

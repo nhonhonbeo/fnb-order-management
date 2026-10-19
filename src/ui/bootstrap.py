@@ -5,26 +5,15 @@ from pathlib import Path
 
 import streamlit as st
 
-try:
-    from src.core.queues.order_queue import KitchenRequest, OrderQueue
-    from src.core.services.auth_service import AuthService
-    from src.core.services.billing_service import BillingService
-    from src.core.services.kitchen_service import KitchenService
-    from src.core.services.menu_service import MenuService
-    from src.core.services.order_service import OrderService
-    from src.core.services.payment_service import PaymentService
-    from src.core.storage import StorageManager
-    from src.ui.presenters import menu_item_view, order_views
-except ImportError:
-    from core.queues.order_queue import KitchenRequest, OrderQueue
-    from core.services.auth_service import AuthService
-    from core.services.billing_service import BillingService
-    from core.services.kitchen_service import KitchenService
-    from core.services.menu_service import MenuService
-    from core.services.order_service import OrderService
-    from core.services.payment_service import PaymentService
-    from core.storage import StorageManager
-    from ui.presenters import menu_item_view, order_views
+from src.core.queues.order_queue import KitchenRequest, OrderQueue
+from src.core.services.auth_service import AuthService
+from src.core.services.billing_service import BillingService
+from src.core.services.kitchen_service import KitchenService
+from src.core.services.menu_service import MenuService
+from src.core.services.order_service import OrderService
+from src.core.services.payment_service import PaymentService
+from src.core.storage import StorageManager
+from src.ui.presenters import menu_item_view, order_views
 
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -46,15 +35,21 @@ def initialise_state() -> None:
     if "order_queue" not in st.session_state:
         st.session_state.order_queue = OrderQueue()
 
-    if "kitchen_service" not in st.session_state:
-        st.session_state.kitchen_service = KitchenService(st.session_state.order_queue)
-
     if "order_service" not in st.session_state:
         st.session_state.order_service = OrderService(
             menu=st.session_state.menu_service,
             queue=st.session_state.order_queue,
             storage_or_path=storage.orders_storage,
         )
+
+    if "kitchen_service" not in st.session_state:
+        st.session_state.kitchen_service = KitchenService(
+            st.session_state.order_queue,
+            storage.kitchen_storage,
+            st.session_state.order_service,
+        )
+    else:
+        st.session_state.kitchen_service.set_order_service(st.session_state.order_service)
 
     if "billing_service" not in st.session_state:
         st.session_state.billing_service = BillingService(storage.invoices_storage)
@@ -83,13 +78,14 @@ def initialise_state() -> None:
         st.session_state.invoices = st.session_state.billing_service.list_invoices()
 
     if "kitchen_queue_initialized" not in st.session_state:
-        for order in st.session_state.order_service.list_orders():
-            if order.status == "IN_PROGRESS":
-                for item in order.items:
-                    st.session_state.kitchen_service.send_to_kitchen(KitchenRequest(
-                        order_id=order.order_id,
-                        item_code=item.item_code,
-                        item_name=item.item_name,
-                        quantity=item.quantity,
-                    ))
+        if not storage.kitchen_storage.exists():
+            for order in st.session_state.order_service.list_orders():
+                if order.status == "IN_PROGRESS":
+                    for item in order.items:
+                        st.session_state.kitchen_service.send_to_kitchen(KitchenRequest(
+                            order_id=order.order_id,
+                            item_code=item.item_code,
+                            item_name=item.item_name,
+                            quantity=item.quantity,
+                        ))
         st.session_state.kitchen_queue_initialized = True

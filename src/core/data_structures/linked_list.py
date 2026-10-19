@@ -1,3 +1,6 @@
+from typing import Any, Iterator
+
+
 class Node:
   """Lớp đại diện cho một nút (Node) trong Danh sách liên kết"""
 
@@ -11,6 +14,7 @@ class LinkedList:
 
   def __init__(self):
     self.head = None  # Giữ vị trí nút đầu tiên của danh sách
+    self.tail = None  # Giữ vị trí nút cuối để thêm phần tử trong O(1)
     self._size = 0  # Đếm số phần tử hiện có
 
   def is_empty(self):
@@ -18,16 +22,13 @@ class LinkedList:
     return self.head is None
 
   def append(self, data):
-    """Thêm một nút mới vào CUỐI danh sách - Độ phức tạp O(n)"""
+    """Thêm một nút mới vào cuối danh sách trong O(1)."""
     new_node = Node(data)
-    if self.is_empty():
-      self.head = new_node
+    if self.tail is None:
+      self.head = self.tail = new_node
     else:
-      current = self.head
-      # Duyệt tới nút cuối cùng (nút có next = None)
-      while current.next:
-        current = current.next
-      current.next = new_node
+      self.tail.next = new_node
+      self.tail = new_node
     self._size += 1
 
   def prepend(self, data):
@@ -35,6 +36,8 @@ class LinkedList:
     new_node = Node(data)
     new_node.next = self.head
     self.head = new_node
+    if self.tail is None:
+      self.tail = new_node
     self._size += 1
 
   def delete(self, data):
@@ -47,6 +50,8 @@ class LinkedList:
     if self.head.data == data:
       self.head = self.head.next
       self._size -= 1
+      if self.head is None:
+        self.tail = None
       return True
 
     # TH2: Nút cần xóa nằm ở giữa hoặc cuối
@@ -63,8 +68,27 @@ class LinkedList:
 
     # Bỏ qua nút current bằng cách nối prev.next trực tiếp tới current.next
     prev.next = current.next
+    if current is self.tail:
+      self.tail = prev
     self._size -= 1
     return True
+
+  def pop_front(self):
+    """Lấy và xóa phần tử đầu danh sách trong O(1)."""
+    if self.is_empty():
+      raise IndexError("Danh sách đang trống")
+    data = self.head.data
+    self.head = self.head.next
+    self._size -= 1
+    if self.head is None:
+      self.tail = None
+    return data
+
+  def peek_front(self):
+    """Trả về phần tử đầu mà không xóa khỏi danh sách."""
+    if self.is_empty():
+      raise IndexError("Danh sách đang trống")
+    return self.head.data
 
   def search(self, data):
     """Tìm kiếm vị trí (index) của giá trị trong danh sách - Độ phức tạp O(n)"""
@@ -93,6 +117,12 @@ class LinkedList:
   def size(self):
     """Trả về số lượng phần tử"""
     return self._size
+
+  def __iter__(self) -> Iterator[Any]:
+    current = self.head
+    while current is not None:
+      yield current.data
+      current = current.next
 
 
 # ==========================================

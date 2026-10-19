@@ -7,7 +7,8 @@
 ```text
 fnb-order-management/
 ├── data/
-│   └── menu_sample.json
+│   ├── menu_seed.json
+│   └── menu.json (được tạo khi chạy, không commit)
 ├── src/
 │   ├── __init__.py
 │   ├── app.py
@@ -45,6 +46,8 @@ fnb-order-management/
 - Thành viên 4: hóa đơn, kiểm thử tích hợp và demo.
 
 ## Cài đặt và chạy
+
+Ở lần chạy đầu, thực đơn chạy được khởi tạo từ `data/menu_seed.json` vào `data/menu.json`.
 
 Cần cài Python 3.10 trở lên và [uv](https://docs.astral.sh/uv/).
 

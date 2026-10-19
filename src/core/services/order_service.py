@@ -1,6 +1,7 @@
 """Nghiệp vụ đơn hàng."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set
 
 from src.core.repositories.order_repository import OrderRepository
@@ -37,16 +38,9 @@ class OrderService:
         """Lưu toàn bộ danh sách đơn hàng ra storage."""
         self.repository.save(self.orders.values())
 
-    def create_order(self, table_id: Any = None, order_id: Optional[str] = None) -> Order:
-        if isinstance(table_id, Order):
-            order = table_id
-            self.orders[order.order_id] = order
-            self.save()
-            return order
-
-        if order_id is None:
-            order_id = "DH" + str(self.next_no).zfill(3)
-            self.next_no += 1
+    def create_order(self, table_id: Any = None) -> Order:
+        order_id = "DH" + str(self.next_no).zfill(3)
+        self.next_no += 1
         order = Order(order_id, table_id)
         self.orders[order_id] = order
         self.save()
@@ -59,6 +53,43 @@ class OrderService:
 
     def list_orders(self) -> List[Order]:
         return list(self.orders.values())
+
+    def search_orders(
+        self,
+        keyword: str | None = None,
+        status: str | None = None,
+    ) -> List[Order]:
+        """Tìm đơn theo một phần mã đơn và/hoặc trạng thái."""
+        orders = self.list_orders()
+        if keyword is not None:
+            normalized_keyword = keyword.casefold()
+            orders = [
+                order for order in orders
+                if normalized_keyword in order.order_id.casefold()
+            ]
+        if status is not None:
+            orders = [order for order in orders if order.status == status]
+        return orders
+
+    def list_history(self) -> List[Order]:
+        """Liệt kê đơn đã thanh toán hoặc hủy, mới nhất trước."""
+        history = [
+            order for order in self.orders.values()
+            if order.status in {"PAID", "CANCELLED"}
+        ]
+
+        def sort_key(order: Order) -> tuple[int, float]:
+            if not isinstance(order.created_at, str) or not order.created_at:
+                return 1, 0
+            try:
+                created_at = datetime.fromisoformat(order.created_at)
+            except ValueError:
+                return 1, 0
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            return 0, -created_at.timestamp()
+
+        return sorted(history, key=sort_key)
 
     def add_item(self, order_id: str, code: str, quantity: int) -> Order:
         order = self.get_order(order_id)
