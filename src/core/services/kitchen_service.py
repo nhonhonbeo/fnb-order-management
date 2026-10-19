@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from src.core.order_queue import KitchenRequest, OrderQueue
+from src.core.queues.order_queue import KitchenRequest, OrderQueue
 
 
 class KitchenService:

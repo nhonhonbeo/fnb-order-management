@@ -1,10 +1,10 @@
 """Kiểm thử tích hợp toàn bộ hệ thống F&B từ Storage, Model, Services đến luồng nghiệp vụ."""
-from src.core.order_queue import OrderQueue
-from src.core.payment_service import PaymentService
+from src.core.queues.order_queue import OrderQueue
 from src.core.services.billing_service import BillingService
 from src.core.services.kitchen_service import KitchenService
 from src.core.services.menu_service import MenuService
 from src.core.services.order_service import OrderService
+from src.core.services.payment_service import PaymentService
 from src.core.storage import StorageManager
 from src.models.payment import PaymentStatus
 

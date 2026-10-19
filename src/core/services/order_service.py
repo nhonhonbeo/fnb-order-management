@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Set
 
-from src.core.order_repository import OrderRepository
+from src.core.repositories.order_repository import OrderRepository
 from src.models.order import Order
 
 
@@ -91,7 +91,7 @@ class OrderService:
         if self.queue is None:
             raise ValueError("Chưa kết nối hàng đợi bếp")
 
-        from src.core.order_queue import KitchenRequest
+        from src.core.queues.order_queue import KitchenRequest
 
         for item in order.items:
             request = KitchenRequest(

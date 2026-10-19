@@ -1,6 +1,6 @@
 import pytest
 
-from src.core.order_queue import OrderQueue
+from src.core.queues.order_queue import OrderQueue
 from src.core.services.menu_service import MenuService
 from src.core.services.order_service import OrderService
 from src.models.menu_item import MenuItem

@@ -1,9 +1,9 @@
 import pytest
 
-from src.core.payment_service import PaymentError, PaymentService
 from src.core.services.billing_service import BillingService
 from src.core.services.menu_service import MenuService
 from src.core.services.order_service import OrderService
+from src.core.services.payment_service import PaymentError, PaymentService
 from src.models.invoice import Invoice
 from src.models.order import Order
 from src.models.payment import Payment

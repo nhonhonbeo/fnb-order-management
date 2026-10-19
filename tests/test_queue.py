@@ -1,7 +1,7 @@
 import pytest
 
 from src.core.data_structures.queue import Queue
-from src.core.order_queue import EmptyQueueError, KitchenRequest, OrderQueue
+from src.core.queues.order_queue import EmptyQueueError, KitchenRequest, OrderQueue
 from src.core.services.kitchen_service import KitchenService
 
 

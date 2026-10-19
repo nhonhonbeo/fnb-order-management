@@ -13,7 +13,7 @@ class OrderRepository:
 
     def __init__(self, storage_or_path: Optional[Any] = None):
         if storage_or_path is None:
-            default_path = Path(__file__).resolve().parents[2] / "data" / "orders.json"
+            default_path = Path(__file__).resolve().parents[3] / "data" / "orders.json"
             self.storage: Optional[JsonStorage] = JsonStorage(default_path)
         elif isinstance(storage_or_path, (str, Path)):
             self.storage = JsonStorage(storage_or_path)

@@ -6,26 +6,24 @@ from pathlib import Path
 import streamlit as st
 
 try:
-    from src.core.order_queue import OrderQueue
-    from src.core.payment_service import PaymentService
+    from src.core.queues.order_queue import KitchenRequest, OrderQueue
     from src.core.services.auth_service import AuthService
     from src.core.services.billing_service import BillingService
     from src.core.services.kitchen_service import KitchenService
     from src.core.services.menu_service import MenuService
     from src.core.services.order_service import OrderService
+    from src.core.services.payment_service import PaymentService
     from src.core.storage import StorageManager
-    from src.core.order_queue import KitchenRequest
     from src.ui.presenters import menu_item_view, order_views
 except ImportError:
-    from core.order_queue import OrderQueue
-    from core.payment_service import PaymentService
+    from core.queues.order_queue import KitchenRequest, OrderQueue
     from core.services.auth_service import AuthService
     from core.services.billing_service import BillingService
     from core.services.kitchen_service import KitchenService
     from core.services.menu_service import MenuService
     from core.services.order_service import OrderService
+    from core.services.payment_service import PaymentService
     from core.storage import StorageManager
-    from core.order_queue import KitchenRequest
     from ui.presenters import menu_item_view, order_views
 
 
