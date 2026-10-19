@@ -69,28 +69,45 @@ def render():
     total_amount = _cart_total(cart)
     st.markdown(f"### Tạm tính: {currency(total_amount)}")
 
+    # Gửi đơn xuống bếp và bọc try...except bắt lỗi an toàn
     if st.button("🚀 Xác nhận & Gửi đơn xuống bếp", type="primary"):
-        order_service = st.session_state.order_service
+        order_service = st.session_state.get("order_service")
+        if not order_service:
+            st.error("Chưa khởi tạo OrderService trong hệ thống.")
+            return
+
         order_id = new_id("OD")
 
-        # 1. Gọi OrderService tạo đơn
-        order = order_service.create_order(table_id=table, order_id=order_id)
+        try:
+            # 1. Gọi OrderService tạo đơn (linh hoạt theo cách viết của backend)
+            try:
+                order = order_service.create_order(table_id=table, order_id=order_id)
+            except TypeError:
+                # Trường hợp backend không nhận order_id hoặc dùng tham số khác
+                order = order_service.create_order(table_id=table)
 
-        # 2. Thêm các món vào OrderService
-        for line in cart:
-            order_service.add_item(order.order_id, line["code"], line["quantity"])
+            actual_order_id = getattr(order, "order_id", getattr(order, "id", order_id))
 
-        # 3. Đưa vào hàng đợi bếp FIFO
-        order_service.send_to_kitchen(order.order_id)
+            # 2. Thêm các món vào OrderService
+            for line in cart:
+                order_service.add_item(actual_order_id, line["code"], line["quantity"])
 
-        # 4. Cập nhật trạng thái bàn và lưu trữ
-        st.session_state.tables[table] = "Đang phục vụ"
-        save_tables_state()
+            # 3. Đưa vào hàng đợi bếp FIFO
+            order_service.send_to_kitchen(actual_order_id)
 
-        # 5. Cập nhật dữ liệu trình bày từ service
-        st.session_state.orders = order_views(order_service.list_orders())
+            # 4. Cập nhật trạng thái bàn và lưu trữ
+            st.session_state.tables[table] = "Đang phục vụ"
+            save_tables_state()
 
-        st.session_state.cart = []
-        st.session_state.pop("selected_table", None)
-        st.success(f"Đã tạo thành công đơn hàng {order.order_id} cho {table} với tổng tiền {currency(order.total())}.")
-        st.rerun()
+            # 5. Cập nhật dữ liệu trình bày từ service
+            st.session_state.orders = order_views(order_service.list_orders())
+
+            st.session_state.cart = []
+            st.session_state.pop("selected_table", None)
+            
+            total_val = order.total() if hasattr(order, "total") else total_amount
+            st.success(f"Đã tạo thành công đơn hàng {actual_order_id} cho {table} với tổng tiền {currency(total_val)}.")
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"Đã xảy ra lỗi khi xử lý đơn hàng: {e}")
