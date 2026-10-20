@@ -4,16 +4,18 @@ from pathlib import Path
 import streamlit as st
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-SRC_DIR = Path(__file__).resolve().parent
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from ui import auth_page, dashboard, menu_page, order_page, queue_page, revenue_page
-from ui.bootstrap import initialise_state
-from ui.state import get_current_user, logout_user
-from ui.styles import inject_css
+from src.users import auth_page
+from src.tables import page as dashboard
+from src.menu import page as menu_page
+from src.orders import page as order_page
+from src.kitchen import page as queue_page
+from src.payments import revenue_page
+from src.ui.bootstrap import initialise_state
+from src.ui.state import get_current_user, logout_user
+from src.ui.styles import inject_css
 
 
 ALL_PAGES = ["Quản lý bàn", "Thực đơn", "Tạo đơn hàng", "Bếp & thanh toán", "Báo cáo doanh thu"]

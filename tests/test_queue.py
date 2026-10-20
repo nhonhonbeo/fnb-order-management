@@ -1,11 +1,11 @@
 import pytest
 
-from src.core.data_structures.queue import Queue
-from src.core.data_structures.linked_list import LinkedList
-from src.core.queues.order_queue import EmptyQueueError, KitchenRequest, OrderQueue
-from src.core.services.kitchen_service import KitchenService
-from src.core.services.menu_service import MenuService
-from src.core.services.order_service import OrderService
+from src.shared.data_structures.queue import Queue
+from src.shared.data_structures.linked_list import LinkedList
+from src.kitchen.queue import EmptyQueueError, KitchenRequest, OrderQueue
+from src.kitchen.service import KitchenService
+from src.menu.service import MenuService
+from src.orders.service import OrderService
 
 
 def test_custom_linked_list_queue():

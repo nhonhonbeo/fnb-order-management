@@ -6,12 +6,8 @@ from uuid import uuid4
 
 import streamlit as st
 from src.ui.presenters import menu_item_view
-from src.money import to_vnd
-
-def save_tables_state() -> None:
-    """Lưu trạng thái sơ đồ bàn hiện tại vào storage."""
-    st.session_state.storage_manager.save_tables(st.session_state.tables)
-
+from src.payments.billing_service import BillingService
+from src.shared.money import to_vnd
 
 def sync_menu_state() -> None:
     """Đồng bộ danh sách thực đơn từ MenuService sang Session State."""
@@ -52,15 +48,8 @@ def new_id(prefix: str) -> str:
 
 
 def order_total(order: Any) -> int:
-    """Tính tổng tiền của một đơn hàng (hỗ trợ cả Order object và dict)."""
-    if hasattr(order, "total"):
-        return to_vnd(order.total())
-    if isinstance(order, dict):
-        if "total" in order and order["total"] is not None:
-            return to_vnd(order["total"])
-        items = order.get("items", [])
-        return sum(to_vnd(line["price"]) * int(line["quantity"]) for line in items)
-    return 0
+    """Compatibility wrapper for the billing service's total calculation."""
+    return BillingService.calculate_total(order)
 
 
 def status_label(status: str) -> str:

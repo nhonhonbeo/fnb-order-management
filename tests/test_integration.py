@@ -1,12 +1,17 @@
 """Kiểm thử tích hợp toàn bộ hệ thống F&B từ Storage, Model, Services đến luồng nghiệp vụ."""
-from src.core.queues.order_queue import OrderQueue
-from src.core.services.billing_service import BillingService
-from src.core.services.kitchen_service import KitchenService
-from src.core.services.menu_service import MenuService
-from src.core.services.order_service import OrderService
-from src.core.services.payment_service import PaymentService
-from src.core.storage import StorageManager
-from src.models.payment import PaymentStatus
+from src.kitchen.queue import OrderQueue
+from src.kitchen.repository import KitchenRepository
+from src.kitchen.service import KitchenService
+from src.menu.repository import MenuRepository
+from src.menu.service import MenuService
+from src.orders.repository import OrderRepository
+from src.orders.service import OrderService
+from src.payments.billing_service import BillingService
+from src.payments.payment import PaymentStatus
+from src.payments.service import PaymentService
+from src.storage.json_storage import StorageManager
+from src.tables.repository import TableRepository
+from src.tables.service import TableService
 
 
 def test_full_fnb_order_and_payment_flow(tmp_path):
@@ -14,7 +19,12 @@ def test_full_fnb_order_and_payment_flow(tmp_path):
     storage_manager = StorageManager(data_dir=data_dir)
 
     # 1. Khởi tạo Backend Services
-    menu_service = MenuService(storage_or_path=storage_manager.menu_storage)
+    menu_repository = MenuRepository(
+        storage_manager.menu_storage,
+        seed_storage=storage_manager.menu_seed_storage,
+        legacy_storage=storage_manager.legacy_menu_storage,
+    )
+    menu_service = MenuService(storage_or_path=menu_repository)
     order_queue = OrderQueue()
     order_service = OrderService(
         menu=menu_service,
@@ -36,14 +46,14 @@ def test_full_fnb_order_and_payment_flow(tmp_path):
     assert len(menu_service.list_items()) == 3
 
     # 3. Tạo đơn hàng gắn với Bàn 1
-    tables = storage_manager.load_tables()
+    table_service = TableService(TableRepository(storage_manager.tables_storage))
+    tables = table_service.list_tables()
     assert tables["Bàn 1"] == "Trống"
 
     order = order_service.create_order(table_id="Bàn 1")
     order_service.add_item(order.order_id, "F001", quantity=2)
     order_service.add_item(order.order_id, "F002", quantity=1)
-    tables["Bàn 1"] = "Đang phục vụ"
-    storage_manager.save_tables(tables)
+    table_service.reserve("Bàn 1")
 
     expected_total = 2 * 45000 + 1 * 25000  # 115000
     assert order.total() == expected_total
@@ -81,12 +91,17 @@ def test_full_fnb_order_and_payment_flow(tmp_path):
     assert billing_service.get_total_revenue() == expected_total
 
     # 8. Mở lại bàn trống
-    tables["Bàn 1"] = "Trống"
-    storage_manager.save_tables(tables)
+    table_service.release("Bàn 1")
 
     # 9. Kiểm tra tính bền vững (Persistence) sau khi nạp lại từ Storage
     reloaded_storage = StorageManager(data_dir=data_dir)
-    reloaded_menu = MenuService(storage_or_path=reloaded_storage.menu_storage)
+    reloaded_menu = MenuService(
+        storage_or_path=MenuRepository(
+            reloaded_storage.menu_storage,
+            seed_storage=reloaded_storage.menu_seed_storage,
+            legacy_storage=reloaded_storage.legacy_menu_storage,
+        )
+    )
     reloaded_orders = OrderService(
         menu=reloaded_menu,
         storage_or_path=reloaded_storage.orders_storage,
@@ -96,7 +111,7 @@ def test_full_fnb_order_and_payment_flow(tmp_path):
         order_service=reloaded_orders,
         storage_or_path=reloaded_storage.payments_storage,
     )
-    reloaded_tables = reloaded_storage.load_tables()
+    reloaded_tables = TableRepository(reloaded_storage.tables_storage).list_all()
 
     assert len(reloaded_menu.list_items()) == 3
     assert reloaded_menu.get_item("F001").name == "Phở bò"

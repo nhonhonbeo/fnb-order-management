@@ -5,14 +5,23 @@ from pathlib import Path
 
 import streamlit as st
 
-from src.core.queues.order_queue import KitchenRequest, OrderQueue
-from src.core.services.auth_service import AuthService
-from src.core.services.billing_service import BillingService
-from src.core.services.kitchen_service import KitchenService
-from src.core.services.menu_service import MenuService
-from src.core.services.order_service import OrderService
-from src.core.services.payment_service import PaymentService
-from src.core.storage import StorageManager
+from src.kitchen.queue import KitchenRequest, OrderQueue
+from src.kitchen.repository import KitchenRepository
+from src.kitchen.service import KitchenService
+from src.menu.repository import MenuRepository
+from src.menu.service import MenuService
+from src.orders.repository import OrderRepository
+from src.orders.service import OrderService
+from src.payments.billing_service import BillingService
+from src.payments.invoice_repository import InvoiceRepository
+from src.payments.payment_repository import PaymentRepository
+from src.payments.service import PaymentService
+from src.reports.service import ReportingService
+from src.storage.json_storage import StorageManager
+from src.tables.repository import TableRepository
+from src.tables.service import TableService
+from src.users.repository import UserRepository
+from src.users.service import AuthService
 from src.ui.presenters import menu_item_view, order_views
 
 
@@ -26,38 +35,63 @@ def initialise_state() -> None:
 
     storage = st.session_state.storage_manager
 
+    if "table_service" not in st.session_state:
+        st.session_state.table_repository = TableRepository(storage.tables_storage)
+        st.session_state.table_service = TableService(st.session_state.table_repository)
+
     if "auth_service" not in st.session_state:
-        st.session_state.auth_service = AuthService(storage.users_storage.file_path)
+        st.session_state.user_repository = UserRepository(storage.users_storage)
+        st.session_state.auth_service = AuthService(st.session_state.user_repository)
 
     if "menu_service" not in st.session_state:
-        st.session_state.menu_service = MenuService(storage.menu_storage)
+        st.session_state.menu_repository = MenuRepository(
+            storage.menu_storage,
+            seed_storage=storage.menu_seed_storage,
+            legacy_storage=storage.legacy_menu_storage,
+        )
+        st.session_state.menu_service = MenuService(st.session_state.menu_repository)
 
     if "order_queue" not in st.session_state:
         st.session_state.order_queue = OrderQueue()
 
     if "order_service" not in st.session_state:
+        st.session_state.order_repository = OrderRepository(storage.orders_storage)
         st.session_state.order_service = OrderService(
             menu=st.session_state.menu_service,
             queue=st.session_state.order_queue,
-            storage_or_path=storage.orders_storage,
+            storage_or_path=st.session_state.order_repository,
+            table_service=st.session_state.table_service,
         )
 
+    st.session_state.menu_service.set_order_service(st.session_state.order_service)
+
     if "kitchen_service" not in st.session_state:
+        st.session_state.kitchen_repository = KitchenRepository(storage.kitchen_storage)
         st.session_state.kitchen_service = KitchenService(
             st.session_state.order_queue,
-            storage.kitchen_storage,
+            st.session_state.kitchen_repository,
             st.session_state.order_service,
         )
     else:
         st.session_state.kitchen_service.set_order_service(st.session_state.order_service)
 
     if "billing_service" not in st.session_state:
-        st.session_state.billing_service = BillingService(storage.invoices_storage)
+        st.session_state.invoice_repository = InvoiceRepository(storage.invoices_storage)
+        st.session_state.billing_service = BillingService(
+            st.session_state.invoice_repository
+        )
+
+    if "reporting_service" not in st.session_state:
+        st.session_state.reporting_service = ReportingService()
 
     if "payment_service" not in st.session_state:
+        st.session_state.payment_repository = PaymentRepository(storage.payments_storage)
         st.session_state.payment_service = PaymentService(
             order_service=st.session_state.order_service,
-            storage_or_path=storage.payments_storage,
+            storage_or_path=st.session_state.payment_repository,
+            billing_service=st.session_state.billing_service,
+            table_service=st.session_state.table_service,
+            kitchen_service=st.session_state.kitchen_service,
         )
 
     st.session_state.setdefault("authenticated_user", None)
@@ -68,8 +102,7 @@ def initialise_state() -> None:
             for item in st.session_state.menu_service.list_items(only_active=False)
         ]
 
-    if "tables" not in st.session_state:
-        st.session_state.tables = storage.load_tables()
+    st.session_state.tables = st.session_state.table_service.list_tables()
 
     if "orders" not in st.session_state:
         st.session_state.orders = order_views(st.session_state.order_service.list_orders())
@@ -78,7 +111,7 @@ def initialise_state() -> None:
         st.session_state.invoices = st.session_state.billing_service.list_invoices()
 
     if "kitchen_queue_initialized" not in st.session_state:
-        if not storage.kitchen_storage.exists():
+        if not st.session_state.kitchen_repository.exists():
             for order in st.session_state.order_service.list_orders():
                 if order.status == "IN_PROGRESS":
                     for item in order.items:

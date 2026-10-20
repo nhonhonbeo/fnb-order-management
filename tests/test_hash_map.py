@@ -1,5 +1,5 @@
-from src.core.data_structures.hash_map import HashMap
-from src.core.data_structures.hash_table import HashTable
+from src.shared.data_structures.hash_map import HashMap
+from src.shared.data_structures.hash_table import HashTable
 
 
 def test_hash_map_crud_and_resize():

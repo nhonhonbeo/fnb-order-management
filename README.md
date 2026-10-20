@@ -1,6 +1,6 @@
 # F&B Order Management
 
-Ứng dụng dòng lệnh quản lý thực đơn, bàn ăn, đơn hàng, hàng đợi bếp và hóa đơn. Dự án phù hợp để thực hành OOP, cấu trúc dữ liệu và kiểm thử Python.
+Ứng dụng Streamlit quản lý thực đơn, bàn ăn, đơn hàng, hàng đợi bếp, hóa đơn và thanh toán. Dự án phù hợp để thực hành OOP, cấu trúc dữ liệu và kiểm thử Python.
 
 ## Cấu trúc thư mục
 
@@ -12,25 +12,16 @@ fnb-order-management/
 ├── src/
 │   ├── __init__.py
 │   ├── app.py
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── dining_table.py
-│   │   ├── invoice.py
-│   │   ├── menu_item.py
-│   │   └── order.py
-│   └── core/
-│       ├── __init__.py
-│       ├── storage.py
-│       ├── data_structures/
-│       │   ├── __init__.py
-│       │   ├── hash_map.py
-│       │   └── queue.py
-│       └── services/
-│           ├── __init__.py
-│           ├── billing_service.py
-│           ├── kitchen_service.py
-│           ├── menu_service.py
-│           └── order_service.py
+│   ├── menu/          # model, repository, service, page, editor
+│   ├── orders/        # model, repository, service, page
+│   ├── kitchen/       # queue, repository, service, page, panel
+│   ├── tables/        # model, repository, service, dashboard page
+│   ├── payments/      # payment/invoice models, repositories, services, UI
+│   ├── users/         # model, repository, authentication service and UI
+│   ├── reports/       # cross-domain reporting calculations
+│   ├── shared/        # reusable data structures, money and repository base
+│   ├── storage/       # shared JSON storage
+│   └── ui/            # Streamlit bootstrap and shared UI helpers
 ├── tests/
 ├── .gitignore
 ├── pyproject.toml
@@ -40,10 +31,10 @@ fnb-order-management/
 
 ## Phân công gợi ý
 
-- Thành viên 1: model thực đơn, bàn ăn và dữ liệu mẫu.
-- Thành viên 2: cấu trúc dữ liệu Queue và Hash Map.
-- Thành viên 3: nghiệp vụ thực đơn, đơn hàng và bếp.
-- Thành viên 4: hóa đơn, kiểm thử tích hợp và demo.
+- Có thể chia thành viên theo package nghiệp vụ: `menu`, `orders`, `kitchen`,
+  `tables`, `payments` hoặc `users`.
+- `shared`, `storage`, `reports` và `ui/bootstrap.py` là thành phần dùng chung;
+  nên thống nhất thay đổi qua pull request khi nhiều module cùng phụ thuộc.
 
 ## Cài đặt và chạy
 
@@ -53,7 +44,7 @@ Cần cài Python 3.10 trở lên và [uv](https://docs.astral.sh/uv/).
 
 ```powershell
 uv sync
-uv run python -m src.app
+uv run streamlit run src/app.py
 ```
 
 Chạy kiểm thử:
@@ -71,4 +62,6 @@ Có thể cài dependency kiểm thử bằng `python -m pip install -r requirem
 - Đưa món vào hàng đợi bếp theo FIFO.
 - Theo dõi trạng thái bàn và tính tổng hóa đơn.
 
-Đây là bộ khung khởi đầu; các thành viên có thể hoàn thiện nghiệp vụ và kiểm thử theo phân công.
+`src/app.py` là entry point Streamlit duy nhất. Dữ liệu JSON tiếp tục nằm trong
+thư mục `data/`; cấu trúc thư mục mã nguồn không làm thay đổi vị trí hay định dạng
+các tệp dữ liệu hiện có.

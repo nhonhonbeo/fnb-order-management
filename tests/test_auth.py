@@ -1,4 +1,4 @@
-from src.core.services.auth_service import AuthService
+from src.users.service import AuthService
 
 
 def test_auth_service_seeds_default_users(tmp_path):

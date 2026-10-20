@@ -1,7 +1,8 @@
 """Chuyển domain models thành dữ liệu ổn định cho các trang Streamlit."""
 from typing import Any, Dict
 
-from src.money import to_vnd
+from src.payments.billing_service import BillingService
+from src.shared.money import to_vnd
 
 
 ORDER_STATUS_LABELS = {
@@ -66,7 +67,7 @@ def order_view(order: Any) -> Dict[str, Any]:
         })
 
     if total is None:
-        total = sum(item["price"] * item["quantity"] for item in view_items)
+        total = BillingService.calculate_total(view_items)
 
     return {
         "id": order_id,

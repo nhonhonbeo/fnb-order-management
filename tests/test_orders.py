@@ -2,11 +2,11 @@ from datetime import datetime
 
 import pytest
 
-from src.core.queues.order_queue import OrderQueue
-from src.core.services.menu_service import DuplicateCodeError, MenuService
-from src.core.services.order_service import OrderService
-from src.models.menu_item import MenuItem
-from src.models.order import Order
+from src.kitchen.queue import OrderQueue
+from src.menu.model import MenuItem
+from src.menu.service import DuplicateCodeError, MenuService
+from src.orders.model import Order
+from src.orders.service import OrderService
 
 
 def test_order_creation_and_item_addition(tmp_path):
