@@ -31,6 +31,15 @@ class OrderQueue:
             self._change_listener(action, value)
 
     def enqueue(self, request: KitchenRequest) -> None:
+        request_key = (request.order_id, request.item_code)
+        if any(
+            (queued.order_id, queued.item_code) == request_key
+            for queued in self.list_requests()
+        ):
+            raise ValueError(
+                f"Món '{request.item_code}' của đơn '{request.order_id}' "
+                "đã có trong hàng đợi"
+            )
         self._items.enqueue(request)
         self._notify_change("enqueue", request)
 

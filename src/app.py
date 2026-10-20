@@ -103,7 +103,10 @@ if current_user is None:
 
     auth_page.render()
 else:
-    allowed_pages = ROLE_PERMISSIONS.get(current_user.role, ALL_PAGES)
+    allowed_pages = ROLE_PERMISSIONS.get(current_user.role, [])
+    if not allowed_pages:
+        st.error("Tài khoản không có quyền truy cập ứng dụng.")
+        st.stop()
 
     st.session_state.setdefault("current_page", allowed_pages[0])
     if st.session_state.current_page not in allowed_pages:

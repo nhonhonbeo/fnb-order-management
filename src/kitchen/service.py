@@ -7,6 +7,10 @@ from src.kitchen.queue import KitchenRequest, OrderQueue
 from src.kitchen.repository import KitchenRepository
 
 
+class KitchenOperationRollbackError(RuntimeError):
+    """Raised when a failed kitchen operation cannot be fully rolled back."""
+
+
 class KitchenService:
     """Điều phối và lưu tiến độ chế biến từng món."""
 
@@ -88,10 +92,16 @@ class KitchenService:
     def send_to_kitchen(self, request_or_item: Any) -> None:
         """Đưa món ăn vào hàng đợi chờ bếp nấu."""
         if not hasattr(self.kitchen_queue, "enqueue"):
-            return
+            raise ValueError("Hàng đợi bếp không hỗ trợ thêm yêu cầu")
+        request_key = self._request_key(request_or_item)
+        if request_key in self._requests:
+            raise ValueError(
+                f"Món '{request_or_item.item_code}' của đơn "
+                f"'{request_or_item.order_id}' đã có trong hàng đợi"
+            )
         self.kitchen_queue.enqueue(request_or_item)
         if not hasattr(self.kitchen_queue, "set_change_listener"):
-            self._requests[self._request_key(request_or_item)] = request_or_item
+            self._requests[request_key] = request_or_item
             self.save()
 
     def current(self) -> Optional[KitchenRequest]:
@@ -107,9 +117,14 @@ class KitchenService:
         if request.status != "NEW":
             raise ValueError("Món không ở trạng thái chờ nấu")
 
+        previous_status = request.status
         request.status = "COOKING"
         self._requests[self._request_key(request)] = request
-        self.save()
+        try:
+            self.save()
+        except Exception:
+            request.status = previous_status
+            raise
         return request
 
     def complete(self, order_id: str, item_code: str) -> KitchenRequest:
@@ -119,22 +134,67 @@ class KitchenService:
         if request.status != "COOKING":
             raise ValueError("Món chưa được bắt đầu chế biến")
 
-        request.status = "READY"
-        self._requests[self._request_key(request)] = request
-        self.kitchen_queue.dequeue()
+        order = (
+            self.order_service.get_order(order_id)
+            if self.order_service is not None
+            else None
+        )
+        queue_before = self.list_requests()
+        request_status_before = request.status
+        order_status_before = order.status if order is not None else None
+        was_loading = self._loading
+        self._loading = True
+        try:
+            request.status = "READY"
+            self._requests[self._request_key(request)] = request
+            self.kitchen_queue.dequeue()
 
-        if self.order_service is not None:
-            order = self.order_service.get_order(order_id)
-            all_ready = bool(order.items) and all(
-                (self._requests.get((order_id, item.item_code)) is not None)
-                and self._requests[(order_id, item.item_code)].status == "READY"
-                for item in order.items
+            all_ready = (
+                order is not None
+                and bool(order.items)
+                and all(
+                    (self._requests.get((order_id, item.item_code)) is not None)
+                    and self._requests[(order_id, item.item_code)].status == "READY"
+                    for item in order.items
+                )
             )
             if all_ready:
                 self.order_service.mark_completed(order_id)
-
-        self.save()
+            self.save()
+        except Exception as error:
+            rollback_errors = []
+            request.status = request_status_before
+            self._requests[self._request_key(request)] = request
+            try:
+                self._restore_queue(queue_before)
+            except Exception as rollback_error:
+                rollback_errors.append(rollback_error)
+            if order is not None and order.status != order_status_before:
+                try:
+                    order.status = order_status_before
+                    self.order_service.save()
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+            try:
+                self.save()
+            except Exception as rollback_error:
+                rollback_errors.append(rollback_error)
+            if rollback_errors:
+                details = "; ".join(str(failure) for failure in rollback_errors)
+                raise KitchenOperationRollbackError(
+                    "Hoàn thành món thất bại và không thể khôi phục đầy đủ trạng thái: "
+                    f"{details}"
+                ) from error
+            raise
+        finally:
+            self._loading = was_loading
         return request
+
+    def _restore_queue(self, requests: List[KitchenRequest]) -> None:
+        while not self.kitchen_queue.is_empty():
+            self.kitchen_queue.dequeue()
+        for request in requests:
+            self.kitchen_queue.enqueue(request)
 
     def next_item(self) -> Any:
         """Lấy món tiếp theo theo thứ tự FIFO."""
@@ -176,6 +236,23 @@ class KitchenService:
                 changed = True
         if changed:
             self.save()
+
+    def snapshot_order_statuses(self, order_id: str) -> dict[str, str]:
+        return {
+            request.item_code: request.status
+            for request in self._requests.values()
+            if request.order_id == order_id
+        }
+
+    def restore_order_statuses(
+        self,
+        order_id: str,
+        statuses: dict[str, str],
+    ) -> None:
+        for request in self._requests.values():
+            if request.order_id == order_id and request.item_code in statuses:
+                request.status = statuses[request.item_code]
+        self.save()
 
     def update_status(self, order_id: str, item_code: str, status: str) -> None:
         """Cập nhật tiến độ chế biến của một yêu cầu trong hàng đợi."""

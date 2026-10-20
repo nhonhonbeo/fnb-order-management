@@ -13,6 +13,10 @@ class PaymentError(ValueError):
     """Lỗi thanh toán khi quá trình thanh toán không hợp lệ."""
 
 
+class CheckoutRollbackError(PaymentError):
+    """Raised when checkout fails and one or more compensating writes also fail."""
+
+
 class PaymentService:
     def __init__(
         self,
@@ -56,7 +60,7 @@ class PaymentService:
     def pay(self, order_id: str, amount: int) -> Payment:
         try:
             order = self._order_service.get_order(order_id)
-        except Exception as error:
+        except ValueError as error:
             raise PaymentError("Không tìm thấy đơn hàng") from error
 
         if order.status == "PAID":
@@ -83,18 +87,27 @@ class PaymentService:
             amount=amount,
             status=PaymentStatus.SUCCESS,
         )
+        previous_status = order.status
         self.repository.add(payment)
         self._payments.append(payment)
         self._next_no += 1
-
         order.status = "PAID"
-        if hasattr(self._order_service, "save"):
-            self._order_service.save()
+        try:
+            if hasattr(self._order_service, "save"):
+                self._order_service.save()
+        except Exception as error:
+            order.status = previous_status
+            self.repository.delete(payment.payment_id)
+            self._payments.remove(payment)
+            self._next_no -= 1
+            raise error
 
         return payment
 
     def checkout(self, order_id: str) -> tuple[Payment, Any]:
         """Complete payment and coordinate its invoice, table, and kitchen updates."""
+        if self._order_service is None:
+            raise PaymentError("Chưa cấu hình dịch vụ đơn hàng")
         if any(
             service is None
             for service in (
@@ -105,16 +118,72 @@ class PaymentService:
         ):
             raise PaymentError("Chưa cấu hình đầy đủ dịch vụ thanh toán")
 
-        order = self._order_service.get_order(order_id)
+        try:
+            order = self._order_service.get_order(order_id)
+        except ValueError as error:
+            raise PaymentError("Không tìm thấy đơn hàng") from error
+
+        table_status = self._table_service.list_tables().get(order.table_id)
+        if table_status is None:
+            raise PaymentError("Không tìm thấy bàn của đơn hàng")
+        kitchen_statuses = self._kitchen_service.snapshot_order_statuses(order_id)
+        previous_order_status = order.status
         payment = self.pay(order_id, self.calculate_amount(order))
-        invoice = self._billing_service.create_invoice(
-            order=order,
-            payment_id=payment.payment_id,
-            invoice_id=f"HD-{uuid4().hex[:6].upper()}",
-        )
-        self._table_service.release(order.table_id)
-        self._kitchen_service.mark_order_done(order_id)
+        table_released = False
+        kitchen_updated = False
+        try:
+            invoice = self._billing_service.create_invoice(
+                order=order,
+                payment_id=payment.payment_id,
+                invoice_id=f"HD-{uuid4().hex[:6].upper()}",
+            )
+            table_released = True
+            self._table_service.release(order.table_id)
+            kitchen_updated = True
+            self._kitchen_service.mark_order_done(order_id)
+        except Exception as error:
+            rollback_errors = []
+            if kitchen_updated:
+                try:
+                    self._kitchen_service.restore_order_statuses(
+                        order_id,
+                        kitchen_statuses,
+                    )
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if table_released:
+                try:
+                    self._table_service.restore_status(order.table_id, table_status)
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+            try:
+                self._billing_service.remove_invoices_for_payment(
+                    payment.payment_id
+                )
+            except Exception as rollback_error:
+                rollback_errors.append(rollback_error)
+            try:
+                self._rollback_payment(payment, order, previous_order_status)
+            except Exception as rollback_error:
+                rollback_errors.append(rollback_error)
+            if rollback_errors:
+                details = "; ".join(str(failure) for failure in rollback_errors)
+                raise CheckoutRollbackError(
+                    f"Thanh toán thất bại và không thể khôi phục đầy đủ trạng thái: {details}"
+                ) from error
+            raise
         return payment, invoice
+
+    def _rollback_payment(self, payment: Payment, order: Any, order_status: str) -> None:
+        self.repository.delete(payment.payment_id)
+        self._payments = [
+            existing for existing in self._payments
+            if existing.payment_id != payment.payment_id
+        ]
+        self._next_no = max(1, self._next_no - 1)
+        order.status = order_status
+        if hasattr(self._order_service, "save"):
+            self._order_service.save()
 
     def list_payments(self) -> List[Payment]:
         return list(self._payments)

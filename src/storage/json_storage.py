@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any
 
 
@@ -38,9 +40,27 @@ class JsonStorage:
 
     def save(self, data: Any) -> None:
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.file_path.open("w", encoding="utf-8") as json_file:
-            json.dump(data, json_file, ensure_ascii=False, indent=2)
-            json_file.write("\n")
+        temporary_path = None
+        try:
+            with NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                dir=self.file_path.parent,
+                prefix=f".{self.file_path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as json_file:
+                temporary_path = Path(json_file.name)
+                json.dump(data, json_file, ensure_ascii=False, indent=2)
+                json_file.write("\n")
+            os.replace(temporary_path, self.file_path)
+            temporary_path = None
+        finally:
+            if temporary_path is not None:
+                try:
+                    temporary_path.unlink()
+                except FileNotFoundError:
+                    pass
 
     def delete(self) -> bool:
         if self.file_path.exists():

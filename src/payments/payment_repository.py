@@ -29,6 +29,27 @@ class PaymentRepository(JsonListRepository[Payment]):
             raise TypeError("PaymentRepository requires a path or JSON storage object")
         super().__init__(storage)
 
+    def validate_record(self, record: Any, index: int) -> dict[str, Any]:
+        validated = super().validate_record(record, index)
+        if any(
+            not isinstance(validated[field], str)
+            for field in ("payment_id", "order_id")
+        ):
+            raise RepositoryDataError(
+                f"Payment {index} in '{self.storage.file_path}' requires string "
+                "payment_id and order_id fields"
+            )
+        amount = validated["amount"]
+        if isinstance(amount, bool) or not isinstance(amount, (int, float)):
+            raise RepositoryDataError(
+                f"Payment {index} in '{self.storage.file_path}' requires a numeric amount"
+            )
+        if "status" in validated and not isinstance(validated["status"], str):
+            raise RepositoryDataError(
+                f"Payment {index} in '{self.storage.file_path}' requires a string status"
+            )
+        return validated
+
     def deserialize(self, record: dict[str, Any]) -> Payment:
         try:
             return Payment.from_dict(record)

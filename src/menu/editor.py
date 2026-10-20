@@ -3,11 +3,12 @@ import streamlit as st
 
 from src.menu.service import DuplicateCodeError
 from src.ui.state import get_current_user, sync_menu_state
+from src.users.permissions import can_manage_menu
 
 
 def render_menu_editor(menu_service) -> None:
     current_user = get_current_user()
-    if not current_user or current_user.role != "Quản lý":
+    if not can_manage_menu(current_user):
         st.caption("🔒 Quyền thêm món mới và sửa thực đơn chỉ dành cho **Quản lý**.")
         return
 

@@ -62,10 +62,28 @@ class MenuRepository(JsonListRepository[MenuItem]):
 
     def validate_record(self, record: Any, index: int) -> dict[str, Any]:
         validated = super().validate_record(record, index)
-        if not (validated.get("code") or validated.get("item_id")):
+        code = validated.get("code") or validated.get("item_id")
+        if not code:
             raise RepositoryDataError(
                 f"Menu item {index} in '{self.storage.file_path}' is missing "
                 "required field(s): code or item_id"
+            )
+        if not isinstance(code, str) or not isinstance(validated["name"], str):
+            raise RepositoryDataError(
+                f"Menu item {index} in '{self.storage.file_path}' requires "
+                "string code and name fields"
+            )
+        if (
+            isinstance(validated["price"], bool)
+            or not isinstance(validated["price"], (int, float))
+        ):
+            raise RepositoryDataError(
+                f"Menu item {index} in '{self.storage.file_path}' requires a numeric price"
+            )
+        if "is_active" in validated and not isinstance(validated["is_active"], bool):
+            raise RepositoryDataError(
+                f"Menu item {index} in '{self.storage.file_path}' requires "
+                "a boolean is_active field"
             )
         return validated
 

@@ -4,17 +4,22 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from src.shared.money import to_vnd
+from src.shared.money import to_whole_vnd
 
 
 # Lớp lưu thông tin của một món ăn trong đơn hàng
 class OrderItem:
     # Hàm khởi tạo, chạy khi tạo một đối tượng OrderItem
     def __init__(self, item_code: str, item_name: str, quantity: int, unit_price: int):
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+            raise ValueError("Số lượng phải là số nguyên lớn hơn 0")
+        normalized_price = to_whole_vnd(unit_price)
+        if normalized_price <= 0:
+            raise ValueError("Đơn giá phải là số nguyên lớn hơn 0")
         self.item_code = str(item_code)
         self.item_name = str(item_name)
-        self.quantity = int(quantity)
-        self.unit_price = to_vnd(unit_price)
+        self.quantity = quantity
+        self.unit_price = normalized_price
 
     # Hàm tính thành tiền của món ăn
     def subtotal(self) -> int:

@@ -1,4 +1,5 @@
 import pytest
+import json
 
 from src.kitchen.queue import OrderQueue
 from src.kitchen.repository import KitchenRepository
@@ -91,6 +92,32 @@ def test_malformed_json_is_reported_and_not_overwritten(tmp_path):
     assert storage.file_path.read_text(encoding="utf-8") == invalid_content
 
 
+def test_empty_json_file_is_reported_without_replacement(tmp_path):
+    storage = JsonStorage(tmp_path / "empty.json")
+    storage.file_path.write_text("", encoding="utf-8")
+
+    with pytest.raises(InvalidJsonFileError):
+        storage.load(default=[])
+
+    assert storage.file_path.read_text(encoding="utf-8") == ""
+
+
+def test_failed_json_write_preserves_previous_file(tmp_path, monkeypatch):
+    storage = JsonStorage(tmp_path / "menu.json")
+    storage.save([{"code": "F001", "name": "Phở", "price": 45000}])
+    original = storage.file_path.read_text(encoding="utf-8")
+
+    def fail_dump(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(json, "dump", fail_dump)
+    with pytest.raises(OSError, match="disk full"):
+        storage.save([{"code": "F002", "name": "Bánh mì", "price": 25000}])
+
+    assert storage.file_path.read_text(encoding="utf-8") == original
+    assert list(tmp_path.glob(".*.tmp")) == []
+
+
 def test_repository_rejects_missing_required_fields(tmp_path):
     storage = JsonStorage(tmp_path / "users.json")
     storage.save([{"username": "missing-password"}])
@@ -99,6 +126,80 @@ def test_repository_rejects_missing_required_fields(tmp_path):
 
     with pytest.raises(ValueError, match="password_hash"):
         UserRepository(storage).list_all()
+
+
+@pytest.mark.parametrize(
+    "record, message",
+    [
+        ({"code": "F001", "name": "Phở", "price": True}, "numeric price"),
+        ({"code": "F001", "name": "Phở", "price": 45000, "is_active": "false"}, "boolean"),
+    ],
+)
+def test_menu_repository_rejects_wrong_field_types_without_overwriting(
+    tmp_path, record, message
+):
+    storage = JsonStorage(tmp_path / "menu.json")
+    storage.save([record])
+
+    with pytest.raises(RepositoryDataError, match=message):
+        MenuRepository(storage).list_all()
+
+    assert storage.load() == [record]
+
+
+def test_order_repository_rejects_wrong_quantity_type(tmp_path):
+    storage = JsonStorage(tmp_path / "orders.json")
+    orders = [{
+        "order_id": "DH001",
+        "items": [{
+            "item_code": "F001",
+            "item_name": "Phở",
+            "quantity": 1.5,
+            "unit_price": 45000,
+        }],
+    }]
+    storage.save(orders)
+
+    with pytest.raises(RepositoryDataError, match="positive integer quantity"):
+        OrderRepository(storage).list_all()
+
+    assert storage.load() == orders
+
+
+def test_kitchen_repository_rejects_wrong_quantity_type(tmp_path):
+    storage = JsonStorage(tmp_path / "kitchen.json")
+    kitchen_data = {
+        "requests": [{
+            "order_id": "DH001",
+            "item_code": "F001",
+            "item_name": "Phở",
+            "quantity": "2",
+            "status": "NEW",
+        }],
+        "queue": [{"order_id": "DH001", "item_code": "F001"}],
+    }
+    storage.save(kitchen_data)
+
+    with pytest.raises(RepositoryDataError, match="positive integer quantity"):
+        KitchenRepository(storage).load_state()
+
+    assert storage.load() == kitchen_data
+
+
+def test_payment_repository_rejects_unknown_status_without_overwriting(tmp_path):
+    storage = JsonStorage(tmp_path / "payments.json")
+    payments = [{
+        "payment_id": "TT001",
+        "order_id": "DH001",
+        "amount": 45000,
+        "status": "FAILED-BUT-UNSUPPORTED",
+    }]
+    storage.save(payments)
+
+    with pytest.raises(RepositoryDataError, match="Trạng thái thanh toán không hợp lệ"):
+        PaymentRepository(storage).list_all()
+
+    assert storage.load() == payments
 
 
 def test_menu_repository_crud_search_and_reload(tmp_path):

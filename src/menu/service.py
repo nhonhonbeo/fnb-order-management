@@ -98,13 +98,18 @@ class MenuService:
         if item is None:
             raise ItemNotFoundError(f"Không tìm thấy món ăn với mã '{code}'.")
 
-        item.update(name=name, price=price)
+        updated_item = MenuItem(
+            code=item.code,
+            name=item.name if name is None else name,
+            price=item.price if price is None else price,
+            is_active=item.is_active,
+        )
         if is_active is not None:
-            if is_active:
-                item.activate()
-            else:
-                item.deactivate()
-        self.repository.update(item)
+            updated_item.is_active = is_active
+        self.repository.update(updated_item)
+        item.name = updated_item.name
+        item.price = updated_item.price
+        item.is_active = updated_item.is_active
         self._map.put(item.code, item)
         return item
 

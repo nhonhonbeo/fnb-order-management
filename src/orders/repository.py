@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from src.shared.repository import JsonListRepository
+from src.shared.repository import JsonListRepository, RepositoryDataError
 from src.storage.json_storage import JsonStorage
 from src.orders.model import Order
 
@@ -29,9 +29,26 @@ class OrderRepository(JsonListRepository[Order]):
         super().__init__(storage)
 
     def deserialize(self, record: dict[str, Any]) -> Order:
-        for index, item in enumerate(record.get("items", [])):
+        if not isinstance(record["order_id"], str):
+            raise RepositoryDataError(
+                f"Order data in '{self.storage.file_path}' requires a string order_id"
+            )
+        if "status" in record and not isinstance(record["status"], str):
+            raise RepositoryDataError(
+                f"Order data in '{self.storage.file_path}' requires a string status"
+            )
+        if record.get("table_id") is not None and not isinstance(record["table_id"], str):
+            raise RepositoryDataError(
+                f"Order data in '{self.storage.file_path}' requires a string table_id"
+            )
+        raw_items = record.get("items", [])
+        if not isinstance(raw_items, list):
+            raise RepositoryDataError(
+                f"Order items in '{self.storage.file_path}' must be a JSON array"
+            )
+        for index, item in enumerate(raw_items):
             if not isinstance(item, dict):
-                raise ValueError(
+                raise RepositoryDataError(
                     f"Order item {index} in '{self.storage.file_path}' must be an object"
                 )
             missing = [
@@ -41,11 +58,38 @@ class OrderRepository(JsonListRepository[Order]):
             if "unit_price" not in item and "price" not in item:
                 missing.append("unit_price")
             if missing:
-                raise ValueError(
+                raise RepositoryDataError(
                     f"Order item {index} in '{self.storage.file_path}' is missing "
                     f"required field(s): {', '.join(missing)}"
                 )
-        return Order.from_dict(record)
+            if (
+                not isinstance(item["item_code"], str)
+                or not isinstance(item["item_name"], str)
+                or not item["item_code"]
+                or not item["item_name"]
+            ):
+                raise RepositoryDataError(
+                    f"Order item {index} in '{self.storage.file_path}' requires "
+                    "string item_code and item_name fields"
+                )
+            quantity = item["quantity"]
+            if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+                raise RepositoryDataError(
+                    f"Order item {index} in '{self.storage.file_path}' requires "
+                    "a positive integer quantity"
+                )
+            unit_price = item.get("unit_price", item.get("price"))
+            if isinstance(unit_price, bool) or not isinstance(unit_price, (int, float)):
+                raise RepositoryDataError(
+                    f"Order item {index} in '{self.storage.file_path}' requires "
+                    "a numeric unit_price"
+                )
+        try:
+            return Order.from_dict(record)
+        except (TypeError, ValueError) as error:
+            raise RepositoryDataError(
+                f"Invalid order in '{self.storage.file_path}': {error}"
+            ) from error
 
     def load(self) -> list[Order]:
         return self.list_all()

@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from src.shared.money import to_vnd
+from src.shared.money import to_whole_vnd
 
 
 class Invoice:
@@ -21,7 +21,9 @@ class Invoice:
     ):
         self.invoice_id = invoice_id or f"HD-{datetime.now().strftime('%y%m%d%H%M%S')}"
         self.order_id = str(order_id)
-        self.total = to_vnd(total)
+        self.total = to_whole_vnd(total)
+        if self.total <= 0:
+            raise ValueError("Tổng hóa đơn phải lớn hơn 0")
         self.table_id = str(table_id)
         self.created_at = created_at or datetime.now().isoformat()
         self.payment_id = str(payment_id)
@@ -75,7 +77,7 @@ class Invoice:
         elif key == "order_id":
             self.order_id = str(value)
         elif key == "total":
-            self.total = to_vnd(value)
+            self.total = to_whole_vnd(value)
         elif key in ("table_id", "table"):
             self.table_id = str(value)
         elif key == "created_at":

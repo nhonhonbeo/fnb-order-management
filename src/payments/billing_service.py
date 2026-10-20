@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from src.payments.invoice_repository import InvoiceRepository
 from src.payments.invoice import Invoice
-from src.shared.money import to_vnd
+from src.shared.money import to_vnd, to_whole_vnd
 
 
 class BillingService:
@@ -36,7 +36,15 @@ class BillingService:
 
         if isinstance(order_or_items, dict):
             if order_or_items.get("total") is not None:
-                return to_vnd(order_or_items["total"])
+                stated_total = to_whole_vnd(order_or_items["total"])
+                if "items" not in order_or_items:
+                    return stated_total
+                line_total = BillingService.calculate_total(order_or_items["items"])
+                if stated_total != line_total:
+                    raise ValueError(
+                        "Tổng hóa đơn không khớp với tổng các dòng chi tiết"
+                    )
+                return line_total
             if "items" in order_or_items:
                 return BillingService.calculate_total(order_or_items["items"])
 
@@ -46,9 +54,18 @@ class BillingService:
                 if hasattr(item, "subtotal"):
                     total += to_vnd(item.subtotal())
                 elif isinstance(item, dict):
-                    price = item.get("unit_price") or item.get("price", 0)
+                    price = (
+                        item["unit_price"]
+                        if "unit_price" in item
+                        else item.get("price", 0)
+                    )
                     qty = item.get("quantity", 1)
-                    total += to_vnd(price) * int(qty)
+                    if isinstance(qty, bool) or not isinstance(qty, int) or qty <= 0:
+                        raise ValueError("Số lượng phải là số nguyên lớn hơn 0")
+                    unit_price = to_whole_vnd(price)
+                    if unit_price <= 0:
+                        raise ValueError("Đơn giá phải là số nguyên lớn hơn 0")
+                    total += unit_price * qty
         return total
 
     def create_invoice(
@@ -85,3 +102,22 @@ class BillingService:
     def get_total_revenue(self) -> int:
         """Tính tổng doanh thu thực tế từ tất cả các hóa đơn."""
         return sum(inv.total for inv in self._invoices)
+
+    def remove_invoice(self, invoice_id: str) -> bool:
+        """Remove an invoice when a coordinated checkout cannot be completed."""
+        if not self.repository.delete(invoice_id):
+            return False
+        self._invoices = [
+            invoice for invoice in self._invoices
+            if invoice.invoice_id != invoice_id
+        ]
+        return True
+
+    def remove_invoices_for_payment(self, payment_id: str) -> None:
+        matching_ids = [
+            invoice.invoice_id
+            for invoice in self.repository.list_all()
+            if invoice.payment_id == payment_id
+        ]
+        for invoice_id in matching_ids:
+            self.remove_invoice(invoice_id)

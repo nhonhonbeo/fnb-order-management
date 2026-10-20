@@ -57,12 +57,34 @@ class KitchenRepository:
                     f"Kitchen request {index} in '{self.storage.file_path}' is missing "
                     f"required field(s): {', '.join(missing)}"
                 )
+            if any(
+                not isinstance(item[key], str)
+                for key in ("order_id", "item_code", "item_name")
+            ):
+                raise RepositoryDataError(
+                    f"Kitchen request {index} in '{self.storage.file_path}' "
+                    "requires string identifiers and item_name"
+                )
+            if (
+                isinstance(item["quantity"], bool)
+                or not isinstance(item["quantity"], int)
+                or item["quantity"] <= 0
+            ):
+                raise RepositoryDataError(
+                    f"Kitchen request {index} in '{self.storage.file_path}' "
+                    "requires a positive integer quantity"
+                )
+            if item.get("status", "NEW") not in {"NEW", "COOKING", "READY", "DONE"}:
+                raise RepositoryDataError(
+                    f"Kitchen request {index} in '{self.storage.file_path}' "
+                    "has an invalid status"
+                )
             try:
                 request = KitchenRequest(
-                    order_id=str(item["order_id"]),
-                    item_code=str(item["item_code"]),
-                    item_name=str(item["item_name"]),
-                    quantity=int(item["quantity"]),
+                    order_id=item["order_id"],
+                    item_code=item["item_code"],
+                    item_name=item["item_name"],
+                    quantity=item["quantity"],
                     status=str(item.get("status", "NEW")),
                 )
             except (TypeError, ValueError) as error:
@@ -90,7 +112,17 @@ class KitchenRepository:
                         f"Kitchen queue entry {index} in '{self.storage.file_path}' "
                         "requires order_id and item_code"
                     )
-                key = (str(item["order_id"]), str(item["item_code"]))
+                if not isinstance(item["order_id"], str) or not isinstance(item["item_code"], str):
+                    raise RepositoryDataError(
+                        f"Kitchen queue entry {index} in '{self.storage.file_path}' "
+                        "requires string order_id and item_code fields"
+                    )
+                key = (item["order_id"], item["item_code"])
+                if key in queue_keys:
+                    raise RepositoryDataError(
+                        f"Kitchen queue in '{self.storage.file_path}' contains "
+                        f"duplicate request {key}"
+                    )
                 if key not in by_key:
                     raise RepositoryDataError(
                         f"Kitchen queue entry {index} references missing request {key}"

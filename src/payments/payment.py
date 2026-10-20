@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict
 
-from src.shared.money import to_vnd
+from src.shared.money import to_whole_vnd
 
 # Định nghĩa các trạng thái thanh toán
 class PaymentStatus(Enum):
@@ -22,7 +22,10 @@ class Payment:
     status: PaymentStatus   # Trạng thái thanh toán (PENDING hoặc SUCCESS)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "amount", to_vnd(self.amount))
+        normalized_amount = to_whole_vnd(self.amount)
+        if normalized_amount <= 0:
+            raise ValueError("Số tiền thanh toán phải lớn hơn 0")
+        object.__setattr__(self, "amount", normalized_amount)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -38,12 +41,12 @@ class Payment:
         if isinstance(raw_status, str):
             try:
                 status = PaymentStatus(raw_status)
-            except ValueError:
-                status = PaymentStatus.SUCCESS
+            except ValueError as error:
+                raise ValueError(f"Trạng thái thanh toán không hợp lệ: {raw_status}") from error
         elif isinstance(raw_status, PaymentStatus):
             status = raw_status
         else:
-            status = PaymentStatus.SUCCESS
+            raise ValueError("Kiểu trạng thái thanh toán không hợp lệ")
 
         return cls(
             payment_id=str(data.get("payment_id", "")),

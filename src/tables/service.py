@@ -38,6 +38,11 @@ class TableService:
             raise ValueError(f"Không tìm thấy bàn '{table_id}'")
         self._set_status(table_id, "Trống")
 
+    def restore_status(self, table_id: str, status: str) -> None:
+        if table_id not in self._tables:
+            raise ValueError(f"Không tìm thấy bàn '{table_id}'")
+        self._set_status(table_id, status)
+
     def _set_status(self, table_id: str, status: str) -> None:
         updated_tables = dict(self._tables)
         updated_tables[table_id] = status

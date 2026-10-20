@@ -12,6 +12,7 @@ from src.reports.service import ReportingService
 from src.storage.json_storage import StorageManager
 from src.tables.repository import TableRepository
 from src.tables.service import TableService
+from src.users.permissions import can_manage_menu, can_view_revenue
 
 
 def test_menu_service_search_edit_toggle_and_safe_remove(tmp_path):
@@ -122,6 +123,111 @@ def test_payment_checkout_coordinates_invoice_table_and_kitchen(tmp_path):
         payments.checkout(order.order_id)
 
 
+def test_checkout_invoice_failure_rolls_back_payment_and_keeps_workflow_state(tmp_path, monkeypatch):
+    storage = StorageManager(tmp_path / "data")
+    tables = TableService(TableRepository(storage.tables_storage))
+    menu = MenuService(tmp_path / "menu.json")
+    menu.add_item("F001", "Phở bò", 45000)
+    queue = OrderQueue()
+    orders = OrderService(menu, queue, storage.orders_storage, tables)
+    kitchen = KitchenService(queue, storage.kitchen_storage, orders)
+    billing = BillingService(storage.invoices_storage)
+    payments = PaymentService(
+        orders,
+        storage.payments_storage,
+        billing_service=billing,
+        table_service=tables,
+        kitchen_service=kitchen,
+    )
+    order = orders.create_order_from_cart(
+        "Bàn 1",
+        [{"code": "F001", "quantity": 1}],
+    )
+    request = kitchen.current()
+    kitchen.start(order.order_id, request.item_code)
+    kitchen.complete(order.order_id, request.item_code)
+    assert order.status == "COMPLETED"
+
+    def fail_invoice(*_args, **_kwargs):
+        raise OSError("invoice file is not writable")
+
+    monkeypatch.setattr(billing, "create_invoice", fail_invoice)
+    with pytest.raises(OSError, match="invoice file is not writable"):
+        payments.checkout(order.order_id)
+
+    assert order.status == "COMPLETED"
+    assert tables.repository.find_by_id("Bàn 1") == "Đang phục vụ"
+    assert kitchen._requests[(order.order_id, "F001")].status == "READY"
+    assert payments.list_payments() == []
+    assert billing.list_invoices() == []
+    assert PaymentService(orders, storage.payments_storage).list_payments() == []
+    assert BillingService(storage.invoices_storage).get_total_revenue() == 0
+
+
+@pytest.mark.parametrize("failure_stage", ["table", "kitchen"])
+def test_checkout_downstream_failure_restores_all_related_state(
+    tmp_path,
+    monkeypatch,
+    failure_stage,
+):
+    storage = StorageManager(tmp_path / "data")
+    tables = TableService(TableRepository(storage.tables_storage))
+    menu = MenuService(tmp_path / "menu.json")
+    menu.add_item("F001", "Phở bò", 45000)
+    queue = OrderQueue()
+    orders = OrderService(menu, queue, storage.orders_storage, tables)
+    kitchen = KitchenService(queue, storage.kitchen_storage, orders)
+    billing = BillingService(storage.invoices_storage)
+    payments = PaymentService(
+        orders,
+        storage.payments_storage,
+        billing_service=billing,
+        table_service=tables,
+        kitchen_service=kitchen,
+    )
+    order = orders.create_order_from_cart(
+        "Bàn 1",
+        [{"code": "F001", "quantity": 1}],
+    )
+    request = kitchen.current()
+    kitchen.start(order.order_id, request.item_code)
+    kitchen.complete(order.order_id, request.item_code)
+
+    def fail(*_args, **_kwargs):
+        raise OSError(f"{failure_stage} update failed")
+
+    target = tables if failure_stage == "table" else kitchen
+    method = "release" if failure_stage == "table" else "mark_order_done"
+    monkeypatch.setattr(target, method, fail)
+    with pytest.raises(OSError, match=f"{failure_stage} update failed"):
+        payments.checkout(order.order_id)
+
+    assert order.status == "COMPLETED"
+    assert tables.repository.find_by_id("Bàn 1") == "Đang phục vụ"
+    assert kitchen._requests[(order.order_id, "F001")].status == "READY"
+    assert queue.is_empty()
+    assert payments.list_payments() == []
+    assert billing.list_invoices() == []
+    assert PaymentService(orders, storage.payments_storage).list_payments() == []
+    assert BillingService(storage.invoices_storage).get_total_revenue() == 0
+
+
+def test_invoice_rejects_inconsistent_order_total_and_preserves_revenue(tmp_path):
+    billing = BillingService(tmp_path / "invoices.json")
+    order = {
+        "order_id": "DH001",
+        "total": 99999,
+        "items": [{"price": 45000, "quantity": 2}],
+    }
+
+    with pytest.raises(ValueError, match="không khớp"):
+        billing.create_invoice(order, payment_id="TT001")
+
+    assert billing.list_invoices() == []
+    assert billing.get_total_revenue() == 0
+    assert not (tmp_path / "invoices.json").exists()
+
+
 def test_reporting_service_calculates_dashboard_data_without_streamlit():
     service = ReportingService()
     now = datetime(2026, 10, 20, 12, 30)
@@ -148,3 +254,16 @@ def test_reporting_service_calculates_dashboard_data_without_streamlit():
     assert service.dashboard_alerts(orders, [Request()], now=now) == [
         "2 món đang chờ bếp quá 15 phút."
     ]
+
+
+def test_ui_permissions_deny_unknown_and_unauthenticated_users():
+    class User:
+        def __init__(self, role):
+            self.role = role
+
+    assert can_manage_menu(User("Quản lý"))
+    assert not can_manage_menu(User("Nhân viên"))
+    assert not can_manage_menu(None)
+    assert can_view_revenue(User("Thu ngân"))
+    assert not can_view_revenue(User("Đầu bếp"))
+    assert not can_view_revenue(None)

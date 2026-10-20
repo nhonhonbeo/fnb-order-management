@@ -119,3 +119,49 @@ def test_legacy_decimal_money_values_are_normalized_to_integer_vnd():
     assert isinstance(order.total(), int)
     assert isinstance(invoice.total, int)
     assert isinstance(payment.amount, int)
+
+
+def test_payment_rejects_missing_order_without_creating_transaction(tmp_path):
+    order_service = OrderService(storage_or_path=tmp_path / "orders.json")
+    payment_service = PaymentService(
+        order_service=order_service,
+        storage_or_path=tmp_path / "payments.json",
+    )
+
+    with pytest.raises(PaymentError, match="Không tìm thấy đơn hàng"):
+        payment_service.pay("DH404", 10000)
+
+    assert payment_service.list_payments() == []
+    assert not (tmp_path / "payments.json").exists()
+
+
+def test_order_save_failure_during_payment_removes_payment_and_restores_state(
+    tmp_path,
+    monkeypatch,
+):
+    menu = MenuService(tmp_path / "menu.json")
+    menu.add_item("F001", "Phở bò", 45000)
+    queue = OrderQueue()
+    orders = OrderService(
+        menu=menu,
+        queue=queue,
+        storage_or_path=tmp_path / "orders.json",
+    )
+    order = orders.create_order()
+    orders.add_item(order.order_id, "F001", 1)
+    orders.send_to_kitchen(order.order_id)
+    orders.mark_completed(order.order_id)
+    payments = PaymentService(orders, tmp_path / "payments.json")
+    original_save = orders.save
+
+    def fail_save():
+        raise OSError("orders file is not writable")
+
+    monkeypatch.setattr(orders, "save", fail_save)
+    with pytest.raises(OSError, match="orders file is not writable"):
+        payments.pay(order.order_id, 45000)
+    monkeypatch.setattr(orders, "save", original_save)
+
+    assert order.status == "COMPLETED"
+    assert payments.list_payments() == []
+    assert PaymentService(orders, tmp_path / "payments.json").list_payments() == []

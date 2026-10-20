@@ -4,7 +4,7 @@ import pytest
 
 from src.kitchen.queue import OrderQueue
 from src.menu.model import MenuItem
-from src.menu.service import DuplicateCodeError, MenuService
+from src.menu.service import DuplicateCodeError, ItemNotFoundError, MenuService
 from src.orders.model import Order
 from src.orders.service import OrderService
 
@@ -107,6 +107,29 @@ def test_menu_rejects_non_positive_price(tmp_path, price):
         menu.add_item("F001", "Phở bò", price)
 
 
+@pytest.mark.parametrize("price", [1.5, "invalid", True])
+def test_menu_rejects_non_whole_or_non_numeric_prices(tmp_path, price):
+    menu = MenuService(tmp_path / "menu.json")
+
+    with pytest.raises(ValueError):
+        menu.add_item("F001", "Phở bò", price)
+
+    assert menu.list_items() == []
+    assert not (tmp_path / "menu.json").exists()
+
+
+def test_menu_rejects_blank_code_and_missing_code_operations_are_safe(tmp_path):
+    menu = MenuService(tmp_path / "menu.json")
+    with pytest.raises(ValueError, match="Mã và tên"):
+        menu.add_item("", "Phở bò", 45000)
+
+    assert menu.get_item("F404") is None
+    with pytest.raises(ItemNotFoundError):
+        menu.update_item("F404", name="Không tồn tại")
+    assert menu.remove_item("F404") is False
+    assert menu.list_items() == []
+
+
 def test_menu_rejects_duplicate_code_and_deactivates_referenced_item(tmp_path):
     menu = MenuService(tmp_path / "menu.json")
     item = menu.add_item("F001", "Phở bò", 45000)
@@ -121,6 +144,69 @@ def test_menu_rejects_duplicate_code_and_deactivates_referenced_item(tmp_path):
     assert menu.remove_item("F001", used_codes=orders.used_codes()) is True
     assert menu.get_item("F001") is item
     assert item.is_active is False
+
+
+def test_menu_invalid_update_preserves_cached_and_persisted_values(tmp_path):
+    menu = MenuService(tmp_path / "menu.json")
+    item = menu.add_item("F001", "Phở bò", 45000)
+
+    with pytest.raises(ValueError, match="Giá"):
+        menu.update_item("F001", name="Phở mới", price=-10)
+
+    assert menu.get_item("F001") is item
+    assert (item.name, item.price) == ("Phở bò", 45000)
+    restored = MenuService(tmp_path / "menu.json").get_item("F001")
+    assert (restored.name, restored.price) == ("Phở bò", 45000)
+
+
+def test_menu_update_storage_failure_does_not_mutate_cached_item(tmp_path, monkeypatch):
+    menu = MenuService(tmp_path / "menu.json")
+    item = menu.add_item("F001", "Phở bò", 45000)
+
+    def fail_update(_item):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(menu.repository, "update", fail_update)
+    with pytest.raises(OSError, match="disk full"):
+        menu.update_item("F001", name="Phở mới", price=50000)
+
+    assert menu.get_item("F001") is item
+    assert (item.name, item.price) == ("Phở bò", 45000)
+    assert MenuService(tmp_path / "menu.json").get_item("F001").name == "Phở bò"
+
+
+def test_empty_cart_and_missing_order_leave_order_queue_and_files_unchanged(tmp_path):
+    menu = MenuService(tmp_path / "menu.json")
+    menu.add_item("F001", "Phở bò", 45000)
+    queue = OrderQueue()
+    service = OrderService(menu, queue, tmp_path / "orders.json")
+
+    with pytest.raises(ValueError, match="Đơn phải có món"):
+        service.create_order_from_cart("Bàn 1", [])
+    with pytest.raises(ValueError, match="Không tìm thấy"):
+        service.add_item("DH999", "F001", 1)
+
+    assert service.list_orders() == []
+    assert queue.is_empty()
+    assert not (tmp_path / "orders.json").exists()
+
+
+def test_repeated_add_item_increments_once_per_action_and_invalid_repeat_is_atomic(tmp_path):
+    menu = MenuService(tmp_path / "menu.json")
+    menu.add_item("F001", "Phở bò", 45000)
+    service = OrderService(menu=menu, storage_or_path=tmp_path / "orders.json")
+    order = service.create_order()
+    service.add_item(order.order_id, "F001", 1)
+    service.add_item(order.order_id, "F001", 1)
+
+    with pytest.raises(ValueError, match="Số lượng"):
+        service.add_item(order.order_id, "F001", 0)
+
+    assert order.total() == 90000
+    assert len(order.items) == 1
+    assert order.items[0].quantity == 2
+    restored = OrderService(menu=menu, storage_or_path=tmp_path / "orders.json")
+    assert restored.get_order(order.order_id).total() == 90000
 
 
 def test_order_persistence_and_used_codes(tmp_path):

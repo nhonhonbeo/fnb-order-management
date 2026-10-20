@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from src.shared.money import to_vnd
+from src.shared.money import to_whole_vnd
 
 
 class MenuItem:
@@ -24,7 +24,7 @@ class MenuItem:
         raw_code = item_id if item_id is not None else code
         self.code: str = str(raw_code).strip().upper() if raw_code else ""
         self.name: str = str(name).strip() if name else ""
-        self.price: int = to_vnd(price)
+        self.price: int = to_whole_vnd(price)
         self.is_active: bool = bool(is_active)
 
         self._validate()
@@ -53,7 +53,7 @@ class MenuItem:
     def update(self, name: Optional[str] = None, price: Optional[int] = None) -> None:
         """Cập nhật tên và/hoặc đơn giá của món ăn."""
         new_name = self.name if name is None else str(name).strip()
-        new_price = self.price if price is None else to_vnd(price)
+        new_price = self.price if price is None else to_whole_vnd(price)
 
         if not new_name:
             raise ValueError("Mã và tên không được rỗng")
@@ -109,7 +109,7 @@ class MenuItem:
         elif key == "name":
             self.name = str(value).strip()
         elif key == "price":
-            self.price = to_vnd(value)
+            self.price = to_whole_vnd(value)
         elif key == "is_active":
             self.is_active = bool(value)
         else:

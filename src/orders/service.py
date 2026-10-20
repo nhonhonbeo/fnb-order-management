@@ -250,8 +250,13 @@ class OrderService:
 
         if order.status != "IN_PROGRESS":
             raise ValueError("Đơn chưa được gửi bếp")
+        previous_status = order.status
         order.status = "COMPLETED"
-        self.save()
+        try:
+            self.save()
+        except Exception:
+            order.status = previous_status
+            raise
         return order
 
     def cancel_order(self, order_id: str) -> Order:

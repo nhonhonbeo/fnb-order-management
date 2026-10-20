@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from src.shared.data_structures.queue import Queue
@@ -76,6 +78,59 @@ def test_order_queue_fifo_and_cancellation():
         oq.dequeue()
 
 
+def test_order_queue_rejects_duplicate_request_without_changing_fifo():
+    oq = OrderQueue()
+    first = KitchenRequest("DH001", "F001", "Phở bò", 1)
+    second = KitchenRequest("DH002", "F002", "Bánh mì", 1)
+    oq.enqueue(first)
+    oq.enqueue(second)
+
+    with pytest.raises(ValueError, match="đã có trong hàng đợi"):
+        oq.enqueue(KitchenRequest("DH001", "F001", "Phở bò", 1))
+
+    assert oq.list_requests() == [first, second]
+    assert oq.peek() is first
+    assert oq.dequeue() is first
+    assert oq.dequeue() is second
+
+
+def test_kitchen_rejects_missing_or_duplicate_requests_without_losing_fifo(tmp_path):
+    queue = OrderQueue()
+    kitchen = KitchenService(queue, tmp_path / "kitchen.json")
+    first = KitchenRequest("DH001", "F001", "Phở bò", 1)
+    kitchen.send_to_kitchen(first)
+    kitchen.send_to_kitchen(KitchenRequest("DH002", "F002", "Bánh mì", 1))
+
+    with pytest.raises(ValueError, match="Không tìm thấy|đầu hàng đợi"):
+        kitchen.start("DH999", "F999")
+    with pytest.raises(ValueError, match="đã có trong hàng đợi"):
+        kitchen.send_to_kitchen(KitchenRequest("DH001", "F001", "Phở bò", 1))
+
+    assert queue.list_requests()[0] is first
+    assert [request.order_id for request in kitchen.list_requests()] == ["DH001", "DH002"]
+
+
+def test_cancelling_cooking_order_removes_it_but_preserves_other_fifo_items(tmp_path):
+    menu = MenuService(tmp_path / "menu.json")
+    menu.add_item("F001", "Phở bò", 1)
+    menu.add_item("F002", "Bánh mì", 1)
+    queue = OrderQueue()
+    orders = OrderService(menu, queue, tmp_path / "orders.json")
+    kitchen = KitchenService(queue, tmp_path / "kitchen.json", orders)
+    cooking_order = orders.create_order()
+    orders.add_item(cooking_order.order_id, "F001", 1)
+    orders.send_to_kitchen(cooking_order.order_id)
+    kitchen.start(cooking_order.order_id, "F001")
+    other = KitchenRequest("DH999", "F002", "Bánh mì", 1)
+    kitchen.send_to_kitchen(other)
+
+    orders.cancel_order(cooking_order.order_id)
+
+    assert cooking_order.status == "CANCELLED"
+    assert queue.list_requests() == [other]
+    assert kitchen.list_requests() == [other]
+
+
 def test_kitchen_service_updates_request_status(tmp_path):
     queue = OrderQueue()
     service = KitchenService(queue, tmp_path / "kitchen.json")
@@ -121,6 +176,52 @@ def test_kitchen_service_enforces_fifo_and_completes_order(tmp_path):
 
     assert kitchen.current() is None
     assert order.status == "COMPLETED"
+
+
+def test_failed_kitchen_persistence_restores_order_status_and_fifo(tmp_path, monkeypatch):
+    order, orders, queue, kitchen, kitchen_path = _create_kitchen_workflow(tmp_path)
+    first = kitchen.current()
+    kitchen.start(order.order_id, first.item_code)
+
+    save_state = kitchen.repository.save_state
+    fail_once = True
+
+    def fail_first_save(requests, queued):
+        nonlocal fail_once
+        if fail_once:
+            fail_once = False
+            raise OSError("kitchen file is not writable")
+        save_state(requests, queued)
+
+    monkeypatch.setattr(kitchen.repository, "save_state", fail_first_save)
+    with pytest.raises(OSError, match="kitchen file is not writable"):
+        kitchen.complete(order.order_id, first.item_code)
+
+    assert order.status == "IN_PROGRESS"
+    assert [request.item_code for request in queue.list_requests()] == ["F001", "F002"]
+    assert first.status == "COOKING"
+    assert json.loads(kitchen_path.read_text(encoding="utf-8"))["queue"] == [
+        {"order_id": order.order_id, "item_code": "F001"},
+        {"order_id": order.order_id, "item_code": "F002"},
+    ]
+    assert json.loads((tmp_path / "orders.json").read_text(encoding="utf-8"))[0]["status"] == "IN_PROGRESS"
+
+
+def test_resending_order_to_kitchen_does_not_duplicate_requests(tmp_path):
+    menu = MenuService(tmp_path / "menu.json")
+    menu.add_item("F001", "Phở bò", 45000)
+    queue = OrderQueue()
+    orders = OrderService(menu, queue, tmp_path / "orders.json")
+    order = orders.create_order()
+    orders.add_item(order.order_id, "F001", 1)
+
+    orders.send_to_kitchen(order.order_id)
+    with pytest.raises(ValueError, match="đang ở trạng thái NEW"):
+        orders.send_to_kitchen(order.order_id)
+
+    assert order.status == "IN_PROGRESS"
+    assert queue.size() == 1
+    assert queue.peek().order_id == order.order_id
 
 
 def test_kitchen_service_restores_queue_order_and_status(tmp_path):

@@ -6,6 +6,7 @@ import streamlit as st
 
 from src.ui.state import currency, get_current_user
 from src.ui.styles import inject_css
+from src.users.permissions import can_view_revenue
 
 
 STATUS = {
@@ -68,7 +69,7 @@ def _render_hourly_revenue(orders):
 def render():
     inject_css()
     current_user = get_current_user()
-    if current_user and current_user.role not in ["Quản lý", "Thu ngân"]:
+    if not can_view_revenue(current_user):
         st.title("Báo cáo doanh thu")
         st.warning("🔒 Bạn không có quyền truy cập trang này. Báo cáo tài chính & doanh thu chỉ dành cho **Quản lý** và **Thu ngân**.")
         return
