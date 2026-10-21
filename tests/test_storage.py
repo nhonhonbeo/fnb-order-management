@@ -186,6 +186,47 @@ def test_kitchen_repository_rejects_wrong_quantity_type(tmp_path):
     assert storage.load() == kitchen_data
 
 
+def test_kitchen_repository_rejects_duplicate_persisted_requests(tmp_path):
+    storage = JsonStorage(tmp_path / "kitchen.json")
+    duplicate = {
+        "order_id": "DH001",
+        "item_code": "F001",
+        "item_name": "Phở",
+        "quantity": 1,
+        "status": "NEW",
+    }
+    kitchen_data = {
+        "requests": [duplicate, duplicate],
+        "queue": [{"order_id": "DH001", "item_code": "F001"}],
+    }
+    storage.save(kitchen_data)
+
+    with pytest.raises(RepositoryDataError, match="duplicate request"):
+        KitchenRepository(storage).load_state()
+
+    assert storage.load() == kitchen_data
+
+
+def test_kitchen_repository_rejects_non_string_status_without_overwriting(tmp_path):
+    storage = JsonStorage(tmp_path / "kitchen.json")
+    kitchen_data = {
+        "requests": [{
+            "order_id": "DH001",
+            "item_code": "F001",
+            "item_name": "Phở",
+            "quantity": 1,
+            "status": ["NEW"],
+        }],
+        "queue": [{"order_id": "DH001", "item_code": "F001"}],
+    }
+    storage.save(kitchen_data)
+
+    with pytest.raises(RepositoryDataError, match="invalid status"):
+        KitchenRepository(storage).load_state()
+
+    assert storage.load() == kitchen_data
+
+
 def test_payment_repository_rejects_unknown_status_without_overwriting(tmp_path):
     storage = JsonStorage(tmp_path / "payments.json")
     payments = [{

@@ -74,7 +74,13 @@ class KitchenRepository:
                     f"Kitchen request {index} in '{self.storage.file_path}' "
                     "requires a positive integer quantity"
                 )
-            if item.get("status", "NEW") not in {"NEW", "COOKING", "READY", "DONE"}:
+            status = item.get("status", "NEW")
+            if not isinstance(status, str) or status not in {
+                "NEW",
+                "COOKING",
+                "READY",
+                "DONE",
+            }:
                 raise RepositoryDataError(
                     f"Kitchen request {index} in '{self.storage.file_path}' "
                     "has an invalid status"
@@ -85,14 +91,20 @@ class KitchenRepository:
                     item_code=item["item_code"],
                     item_name=item["item_name"],
                     quantity=item["quantity"],
-                    status=str(item.get("status", "NEW")),
+                    status=status,
                 )
             except (TypeError, ValueError) as error:
                 raise RepositoryDataError(
                     f"Invalid kitchen request {index} in '{self.storage.file_path}': {error}"
                 ) from error
+            request_key = (request.order_id, request.item_code)
+            if request_key in by_key:
+                raise RepositoryDataError(
+                    f"Kitchen data in '{self.storage.file_path}' contains "
+                    f"duplicate request {request_key}"
+                )
             requests.append(request)
-            by_key[(request.order_id, request.item_code)] = request
+            by_key[request_key] = request
 
         if raw_queue is None:
             queue_keys = [

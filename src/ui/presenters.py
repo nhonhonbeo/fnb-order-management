@@ -1,38 +1,47 @@
 """Chuyển domain models thành dữ liệu ổn định cho các trang Streamlit."""
-from typing import Any, Dict
+from collections.abc import Mapping
+from typing import Any
 
 from src.payments.billing_service import BillingService
+from src.shared.data_structures.hash_map import HashMap
 from src.shared.money import to_vnd
 
 
-ORDER_STATUS_LABELS = {
-    "IN_PROGRESS": "COOKING",
-    "COMPLETED": "READY",
-}
+def _make_hash_map(*entries: tuple[str, Any]) -> HashMap:
+    result = HashMap()
+    for key, value in entries:
+        result.put(key, value)
+    return result
 
 
-def menu_item_view(item: Any) -> Dict[str, Any]:
-    if isinstance(item, dict):
+ORDER_STATUS_LABELS = _make_hash_map(
+    ("IN_PROGRESS", "COOKING"),
+    ("COMPLETED", "READY"),
+)
+
+
+def menu_item_view(item: Any) -> HashMap:
+    if isinstance(item, Mapping):
         code = item.get("code") or item.get("item_id", "")
-        return {
-            "item_id": item.get("item_id") or code,
-            "code": code,
-            "name": item.get("name", ""),
-            "price": item.get("price", 0),
-            "is_active": item.get("is_active", True),
-        }
+        return _make_hash_map(
+            ("item_id", item.get("item_id") or code),
+            ("code", code),
+            ("name", item.get("name", "")),
+            ("price", item.get("price", 0)),
+            ("is_active", item.get("is_active", True)),
+        )
 
-    return {
-        "item_id": item.code,
-        "code": item.code,
-        "name": item.name,
-        "price": item.price,
-        "is_active": item.is_active,
-    }
+    return _make_hash_map(
+        ("item_id", item.code),
+        ("code", item.code),
+        ("name", item.name),
+        ("price", item.price),
+        ("is_active", item.is_active),
+    )
 
 
-def order_view(order: Any) -> Dict[str, Any]:
-    if isinstance(order, dict):
+def order_view(order: Any) -> HashMap:
+    if isinstance(order, Mapping):
         order_id = order.get("id") or order.get("order_id", "")
         table = order.get("table") or order.get("table_id", "")
         status = order.get("status", "NEW")
@@ -47,7 +56,7 @@ def order_view(order: Any) -> Dict[str, Any]:
 
     view_items = []
     for item in items:
-        if isinstance(item, dict):
+        if isinstance(item, Mapping):
             code = item.get("code") or item.get("item_code") or item.get("item_id", "")
             name = item.get("name") or item.get("item_name", "")
             price = item.get("price", item.get("unit_price", 0))
@@ -58,26 +67,45 @@ def order_view(order: Any) -> Dict[str, Any]:
             price = item.unit_price
             quantity = item.quantity
 
-        view_items.append({
-            "code": code,
-            "item_id": code,
-            "name": name,
-            "price": price,
-            "quantity": quantity,
-        })
+        view_items.append(_make_hash_map(
+            ("code", code),
+            ("item_id", code),
+            ("name", name),
+            ("price", price),
+            ("quantity", quantity),
+        ))
 
     if total is None:
         total = BillingService.calculate_total(view_items)
 
-    return {
-        "id": order_id,
-        "table": table,
-        "status": ORDER_STATUS_LABELS.get(status, status),
-        "created_at": getattr(order, "created_at", None) if not isinstance(order, dict) else order.get("created_at"),
-        "items": view_items,
-        "total": to_vnd(total),
-    }
+    return _make_hash_map(
+        ("id", order_id),
+        ("table", table),
+        ("status", ORDER_STATUS_LABELS.get(status, status)),
+        (
+            "created_at",
+            order.get("created_at") if isinstance(order, Mapping)
+            else getattr(order, "created_at", None),
+        ),
+        (
+            "note",
+            order.get("note", "") if isinstance(order, Mapping)
+            else getattr(order, "note", ""),
+        ),
+        (
+            "cancelled_at",
+            order.get("cancelled_at") if isinstance(order, Mapping)
+            else getattr(order, "cancelled_at", None),
+        ),
+        (
+            "cancel_reason",
+            order.get("cancel_reason") if isinstance(order, Mapping)
+            else getattr(order, "cancel_reason", None),
+        ),
+        ("items", view_items),
+        ("total", to_vnd(total)),
+    )
 
 
-def order_views(orders: list[Any]) -> list[Dict[str, Any]]:
+def order_views(orders: list[Any]) -> list[HashMap]:
     return [order_view(order) for order in orders]

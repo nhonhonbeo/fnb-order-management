@@ -6,7 +6,12 @@ from typing import Any, Dict, List, Optional, Set
 
 from src.kitchen.queue import KitchenRequest
 from src.orders.repository import OrderRepository
-from src.orders.model import Order
+from src.orders.model import Order, OrderItem
+from src.users.permissions import can_cancel_order, can_edit_order
+
+
+class OrderOperationRollbackError(RuntimeError):
+    """Raised when an order operation fails and compensation is incomplete."""
 
 
 class OrderService:
@@ -16,10 +21,12 @@ class OrderService:
         queue: Any = None,
         storage_or_path: Optional[Any] = None,
         table_service: Any = None,
+        kitchen_service: Any = None,
     ):
         self.menu = menu
         self.queue = queue
         self.table_service = table_service
+        self.kitchen_service = kitchen_service
         self.repository = (
             storage_or_path
             if isinstance(storage_or_path, OrderRepository)
@@ -60,6 +67,9 @@ class OrderService:
 
     def list_orders(self) -> List[Order]:
         return list(self.orders.values())
+
+    def set_kitchen_service(self, kitchen_service: Any) -> None:
+        self.kitchen_service = kitchen_service
 
     def search_orders(
         self,
@@ -259,16 +269,203 @@ class OrderService:
             raise
         return order
 
-    def cancel_order(self, order_id: str) -> Order:
+    def edit_order(
+        self,
+        order_id: str,
+        items: List[Dict[str, Any]],
+        user: Any,
+        note: Optional[str] = None,
+        table_id: Optional[str] = None,
+    ) -> Order:
+        order = self.get_order(order_id)
+        if not can_edit_order(user, order):
+            raise ValueError("Bạn không có quyền sửa đơn hàng này")
+        if order.status not in {"NEW", "IN_PROGRESS", "COMPLETED"}:
+            raise ValueError("Không thể sửa đơn hàng ở trạng thái hiện tại")
+        if not isinstance(items, list):
+            raise ValueError("Danh sách món không hợp lệ")
+        if note is not None and not isinstance(note, str):
+            raise ValueError("Ghi chú phải là văn bản")
+
+        existing = {item.item_code: item for item in order.items}
+        updated_items: list[OrderItem] = []
+        seen_codes: set[str] = set()
+        for line in items:
+            if not isinstance(line, dict):
+                raise ValueError("Thông tin món ăn không hợp lệ")
+            code = line.get("code", line.get("item_code", ""))
+            quantity = line.get("quantity")
+            if not isinstance(code, str) or not code.strip():
+                raise ValueError("Mã món không được để trống")
+            code = code.strip().upper()
+            if code in seen_codes:
+                raise ValueError("Mỗi món chỉ được xuất hiện một lần trong đơn")
+            seen_codes.add(code)
+            self._validate_quantity(quantity)
+
+            previous = existing.get(code)
+            if previous is not None:
+                updated_items.append(OrderItem(
+                    code,
+                    previous.item_name,
+                    quantity,
+                    previous.unit_price,
+                ))
+                continue
+            if self.menu is None:
+                raise ValueError("Chưa kết nối thực đơn")
+            menu_item = self.menu.get_item(code)
+            if menu_item is None:
+                raise ValueError(f"Không tìm thấy món ăn '{code}'")
+            if not menu_item.is_active:
+                raise ValueError("Món ăn đã ngừng kinh doanh")
+            updated_items.append(OrderItem(
+                menu_item.code,
+                menu_item.name,
+                quantity,
+                menu_item.price,
+            ))
+
+        if order.status != "NEW" and not updated_items:
+            raise ValueError("Đơn đã gửi bếp phải có ít nhất một món")
+        if table_id is not None and not isinstance(table_id, str):
+            raise ValueError("Bàn không hợp lệ")
+        new_table_id = table_id if table_id is not None else order.table_id
+        if new_table_id != order.table_id and self.table_service is None:
+            raise ValueError("Chưa kết nối dịch vụ bàn")
+        if (
+            new_table_id != order.table_id
+            and self.table_service is not None
+            and not self.table_service.is_available(new_table_id)
+        ):
+            raise ValueError("Bàn mới không tồn tại hoặc đang được phục vụ")
+
+        kitchen_snapshot = None
+        desired_requests: list[KitchenRequest] = []
+        new_item_codes = set()
+        if order.status in {"IN_PROGRESS", "COMPLETED"}:
+            if self.kitchen_service is None:
+                raise ValueError("Chưa kết nối dịch vụ bếp để sửa đơn đã gửi")
+            kitchen_snapshot = self.kitchen_service.snapshot_order_state()
+            new_item_codes = set(seen_codes) - set(existing)
+            desired_requests = [
+                KitchenRequest(
+                    order_id=order.order_id,
+                    item_code=item.item_code,
+                    item_name=item.item_name,
+                    quantity=item.quantity,
+                )
+                for item in updated_items
+            ]
+
+        old_items = order.items
+        old_note = order.note
+        old_table_id = order.table_id
+        old_status = order.status
+        table_snapshot = (
+            self.table_service.list_tables()
+            if self.table_service is not None and new_table_id != old_table_id
+            else None
+        )
+        try:
+            if kitchen_snapshot is not None:
+                self.kitchen_service.replace_order_requests(
+                    order.order_id,
+                    desired_requests,
+                )
+            if table_snapshot is not None:
+                self.table_service.move_reservation(old_table_id, new_table_id)
+            order.items = updated_items
+            order.note = order.note if note is None else note.strip()
+            order.table_id = new_table_id
+            if order.status == "COMPLETED" and new_item_codes:
+                order.status = "IN_PROGRESS"
+            self.save()
+        except Exception as error:
+            order.items = old_items
+            order.note = old_note
+            order.table_id = old_table_id
+            order.status = old_status
+            rollback_errors = []
+            if table_snapshot is not None:
+                try:
+                    self.table_service.restore_statuses(table_snapshot)
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if kitchen_snapshot is not None:
+                try:
+                    self.kitchen_service.restore_order_state(kitchen_snapshot)
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if rollback_errors:
+                details = "; ".join(str(failure) for failure in rollback_errors)
+                raise OrderOperationRollbackError(
+                    f"Sửa đơn thất bại và không thể khôi phục đầy đủ trạng thái: {details}"
+                ) from error
+            raise
+        return order
+
+    def cancel_order(
+        self,
+        order_id: str,
+        reason: Optional[str] = None,
+        user: Any = None,
+    ) -> Order:
         order = self.get_order(order_id)
         if order.status == "PAID":
             raise ValueError("Không thể hủy đơn đã thanh toán")
+        if order.status == "CANCELLED":
+            raise ValueError("Đơn hàng đã được huỷ")
+        if not can_cancel_order(user, order):
+            raise ValueError("Bạn không có quyền huỷ đơn hàng này")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("Vui lòng nhập lý do huỷ đơn")
+        if order.status not in {"NEW", "IN_PROGRESS", "COMPLETED"}:
+            raise ValueError("Không thể huỷ đơn ở trạng thái hiện tại")
 
-        if self.queue is not None:
-            self.queue.remove_by_order(order_id)
-
-        order.status = "CANCELLED"
-        self.save()
+        kitchen_snapshot = (
+            self.kitchen_service.snapshot_order_state()
+            if self.kitchen_service is not None
+            else None
+        )
+        table_snapshot = (
+            self.table_service.list_tables()
+            if self.table_service is not None and order.table_id is not None
+            else None
+        )
+        old_status = order.status
+        old_cancelled_at = order.cancelled_at
+        old_cancel_reason = order.cancel_reason
+        try:
+            if self.queue is not None:
+                self.queue.remove_by_order(order_id)
+            if table_snapshot is not None:
+                self.table_service.release(order.table_id)
+            order.status = "CANCELLED"
+            order.cancelled_at = datetime.now().astimezone().isoformat()
+            order.cancel_reason = reason.strip()
+            self.save()
+        except Exception as error:
+            order.status = old_status
+            order.cancelled_at = old_cancelled_at
+            order.cancel_reason = old_cancel_reason
+            rollback_errors = []
+            if table_snapshot is not None:
+                try:
+                    self.table_service.restore_statuses(table_snapshot)
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if kitchen_snapshot is not None:
+                try:
+                    self.kitchen_service.restore_order_state(kitchen_snapshot)
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if rollback_errors:
+                details = "; ".join(str(failure) for failure in rollback_errors)
+                raise OrderOperationRollbackError(
+                    f"Huỷ đơn thất bại và không thể khôi phục đầy đủ trạng thái: {details}"
+                ) from error
+            raise
         return order
 
     def used_codes(self) -> Set[str]:

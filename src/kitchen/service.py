@@ -254,6 +254,118 @@ class KitchenService:
                 request.status = statuses[request.item_code]
         self.save()
 
+    def snapshot_order_state(self) -> tuple[dict[Tuple[str, str], KitchenRequest], List[KitchenRequest]]:
+        return dict(self._requests), self.list_requests()
+
+    def restore_order_state(
+        self,
+        snapshot: tuple[dict[Tuple[str, str], KitchenRequest], List[KitchenRequest]],
+    ) -> None:
+        requests, queued = snapshot
+        self._loading = True
+        try:
+            self._requests = dict(requests)
+            self.kitchen_queue.replace_all(list(queued))
+        finally:
+            self._loading = False
+        self.save()
+
+    def replace_order_requests(
+        self,
+        order_id: str,
+        desired_requests: List[KitchenRequest],
+    ) -> None:
+        desired = {request.item_code: request for request in desired_requests}
+        if len(desired) != len(desired_requests):
+            raise ValueError("Đơn hàng không được có món trùng")
+        if any(request.order_id != order_id for request in desired_requests):
+            raise ValueError("Yêu cầu bếp không khớp với đơn hàng")
+
+        existing = {
+            request.item_code: request
+            for request in self._requests.values()
+            if request.order_id == order_id
+        }
+        for item_code, request in existing.items():
+            replacement = desired.get(item_code)
+            if request.status != "NEW" and (
+                replacement is None or replacement.quantity != request.quantity
+            ):
+                raise ValueError(
+                    f"Món '{request.item_name}' đã bắt đầu chế biến, "
+                    "không thể xóa hoặc đổi số lượng"
+                )
+
+        next_requests = {
+            key: request
+            for key, request in self._requests.items()
+            if request.order_id != order_id
+        }
+        replacements: dict[str, KitchenRequest] = {}
+        for item_code, requested in desired.items():
+            previous = existing.get(item_code)
+            if previous is None:
+                replacement = KitchenRequest(
+                    order_id=order_id,
+                    item_code=item_code,
+                    item_name=requested.item_name,
+                    quantity=requested.quantity,
+                )
+            elif previous.status == "NEW":
+                replacement = KitchenRequest(
+                    order_id=order_id,
+                    item_code=item_code,
+                    item_name=requested.item_name,
+                    quantity=requested.quantity,
+                )
+            else:
+                replacement = KitchenRequest(
+                    order_id=order_id,
+                    item_code=item_code,
+                    item_name=previous.item_name,
+                    quantity=previous.quantity,
+                    status=previous.status,
+                )
+            replacements[item_code] = replacement
+            next_requests[(order_id, item_code)] = replacement
+
+        current_queue = self.list_requests()
+        next_queue: list[KitchenRequest] = []
+        queued_codes: set[str] = set()
+        for request in current_queue:
+            if request.order_id != order_id:
+                next_queue.append(request)
+                continue
+            replacement = replacements.get(request.item_code)
+            if replacement is not None:
+                next_queue.append(replacement)
+                queued_codes.add(request.item_code)
+        for item_code, replacement in replacements.items():
+            if item_code not in queued_codes and item_code not in existing:
+                next_queue.append(replacement)
+
+        old_requests = self._requests
+        old_queue = current_queue
+        was_loading = self._loading
+        self._loading = True
+        try:
+            self._requests = next_requests
+            self.kitchen_queue.replace_all(next_queue)
+            self.save()
+        except Exception as error:
+            self._requests = old_requests
+            try:
+                self.kitchen_queue.replace_all(old_queue)
+                self.save()
+            except Exception as rollback_error:
+                raise KitchenOperationRollbackError(
+                    "Không thể cập nhật yêu cầu bếp và hoàn tác đầy đủ: "
+                    f"{rollback_error}"
+                ) from error
+            raise
+        finally:
+            self._loading = was_loading
+
     def update_status(self, order_id: str, item_code: str, status: str) -> None:
         """Cập nhật tiến độ chế biến của một yêu cầu trong hàng đợi."""
         if status not in {"NEW", "COOKING", "READY", "DONE"}:

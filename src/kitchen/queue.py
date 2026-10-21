@@ -71,3 +71,12 @@ class OrderQueue:
                 new_items.enqueue(request)
         self._items = new_items
         self._notify_change("remove_by_order", order_id)
+
+    def replace_all(self, requests: List[KitchenRequest]) -> None:
+        keys = [(request.order_id, request.item_code) for request in requests]
+        if len(keys) != len(set(keys)):
+            raise ValueError("Hàng đợi không thể chứa yêu cầu trùng")
+        self._items = Queue()
+        for request in requests:
+            self._items.enqueue(request)
+        self._notify_change("replace_all", list(requests))

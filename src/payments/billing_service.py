@@ -1,7 +1,8 @@
 """Nghiệp vụ tính tiền, xuất hóa đơn và thống kê doanh thu (Billing Service)."""
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from collections.abc import Mapping
+from typing import Any, List, Optional
 
 from src.payments.invoice_repository import InvoiceRepository
 from src.payments.invoice import Invoice
@@ -34,7 +35,7 @@ class BillingService:
         if hasattr(order_or_items, "total"):
             return to_vnd(order_or_items.total())
 
-        if isinstance(order_or_items, dict):
+        if isinstance(order_or_items, Mapping):
             if order_or_items.get("total") is not None:
                 stated_total = to_whole_vnd(order_or_items["total"])
                 if "items" not in order_or_items:
@@ -53,7 +54,7 @@ class BillingService:
             for item in order_or_items:
                 if hasattr(item, "subtotal"):
                     total += to_vnd(item.subtotal())
-                elif isinstance(item, dict):
+                elif isinstance(item, Mapping):
                     price = (
                         item["unit_price"]
                         if "unit_price" in item
@@ -75,7 +76,7 @@ class BillingService:
         invoice_id: Optional[str] = None,
     ) -> Invoice:
         """Tạo hóa đơn từ đơn hàng và lưu vào storage."""
-        if isinstance(order, dict):
+        if isinstance(order, Mapping):
             order_id = str(order.get("order_id") or order.get("id", ""))
             table_id = str(order.get("table_id") or order.get("table", ""))
         else:

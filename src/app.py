@@ -133,7 +133,7 @@ else:
         st.caption(f"🛡️ Quyền truy cập: **{current_user.role}**")
 
         st.write("")
-        if st.button("🚪 Đăng xuất", use_container_width=True):
+        if st.button("🚪 Đăng xuất", use_container_width=True, key="logout_button"):
             logout_user()
             st.toast("Đã đăng xuất khỏi hệ thống. Hẹn gặp lại!", icon="👋")
             st.rerun()

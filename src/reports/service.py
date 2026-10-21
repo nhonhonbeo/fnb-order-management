@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
@@ -10,20 +11,24 @@ from src.payments.billing_service import BillingService
 
 class ReportingService:
     @staticmethod
-    def order_item_count(order: Dict[str, Any]) -> int:
+    def _included_orders(
+        orders: List[Mapping[str, Any]],
+    ) -> List[Mapping[str, Any]]:
+        return [order for order in orders if order.get("status") != "CANCELLED"]
+
+    @staticmethod
+    def order_item_count(order: Mapping[str, Any]) -> int:
         return sum(item["quantity"] for item in order["items"])
 
     @staticmethod
     def table_statuses(
-        tables: Dict[str, str],
-        orders: List[Dict[str, Any]],
+        tables: Mapping[str, str],
+        orders: List[Mapping[str, Any]],
         now: datetime | None = None,
     ) -> List[Dict[str, Any]]:
-        if not tables:
-            tables = {f"Bàn {index}": "Trống" for index in range(1, 11)}
         active_orders = {
             order["table"]: order
-            for order in orders
+            for order in ReportingService._included_orders(orders)
             if order["status"] != "PAID"
         }
         current_time = now or datetime.now()
@@ -47,19 +52,19 @@ class ReportingService:
 
     @staticmethod
     def best_sellers(
-        orders: List[Dict[str, Any]],
+        orders: List[Mapping[str, Any]],
         limit: int = 5,
     ) -> List[Tuple[str, int]]:
         counts: Counter[str] = Counter()
-        for order in orders:
+        for order in ReportingService._included_orders(orders):
             for item in order["items"]:
                 counts[item["name"]] += item["quantity"]
         return counts.most_common(limit)
 
     @staticmethod
-    def hourly_revenue(orders: List[Dict[str, Any]]) -> Dict[str, int]:
+    def hourly_revenue(orders: List[Mapping[str, Any]]) -> Dict[str, int]:
         revenue = {f"{hour:02d}:00": 0 for hour in range(9, 19)}
-        for order in orders:
+        for order in ReportingService._included_orders(orders):
             if not order.get("created_at"):
                 continue
             hour = datetime.fromisoformat(order["created_at"]).hour
@@ -70,7 +75,7 @@ class ReportingService:
 
     @staticmethod
     def dashboard_alerts(
-        orders: List[Dict[str, Any]],
+        orders: List[Mapping[str, Any]],
         requests: List[Any],
         now: datetime | None = None,
     ) -> List[str]:
@@ -82,7 +87,7 @@ class ReportingService:
         }
         delayed_items = 0
         long_seated_tables = 0
-        for order in orders:
+        for order in ReportingService._included_orders(orders):
             if not order.get("created_at"):
                 continue
             elapsed = (current_time - datetime.fromisoformat(order["created_at"])).total_seconds() / 60

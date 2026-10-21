@@ -1,4 +1,5 @@
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,7 +13,7 @@ from src.reports.service import ReportingService
 from src.storage.json_storage import StorageManager
 from src.tables.repository import TableRepository
 from src.tables.service import TableService
-from src.users.permissions import can_manage_menu, can_view_revenue
+from src.users.permissions import can_manage_menu, can_manage_tables, can_view_revenue
 
 
 def test_menu_service_search_edit_toggle_and_safe_remove(tmp_path):
@@ -267,3 +268,60 @@ def test_ui_permissions_deny_unknown_and_unauthenticated_users():
     assert can_view_revenue(User("Thu ngân"))
     assert not can_view_revenue(User("Đầu bếp"))
     assert not can_view_revenue(None)
+
+
+def test_table_service_adds_trimmed_names_and_rejects_empty_or_duplicate_names(tmp_path):
+    tables = TableService(tmp_path / "tables.json")
+
+    tables.add_table("  Bàn VIP  ")
+
+    assert tables.list_tables()["Bàn VIP"] == "Trống"
+    with pytest.raises(ValueError, match="Tên bàn không được để trống"):
+        tables.add_table("  ")
+    with pytest.raises(ValueError, match="đã tồn tại"):
+        tables.add_table(" bàn vip ")
+
+
+def test_table_service_only_deletes_empty_tables_without_active_orders(tmp_path):
+    tables = TableService(tmp_path / "tables.json")
+    tables.set_orders_provider(
+        lambda: [SimpleNamespace(table_id="Bàn 1", status="IN_PROGRESS")]
+    )
+
+    with pytest.raises(ValueError, match="đang có đơn chưa thanh toán"):
+        tables.delete_table("Bàn 1")
+
+    tables.set_orders_provider(
+        lambda: [SimpleNamespace(table_id="Bàn 1", status="CANCELLED")]
+    )
+    tables.delete_table("Bàn 1")
+    assert "Bàn 1" not in tables.list_tables()
+
+    tables.delete_table("Bàn 2")
+    assert "Bàn 2" not in tables.list_tables()
+    with pytest.raises(ValueError, match="Không tìm thấy bàn"):
+        tables.delete_table("Bàn không tồn tại")
+
+
+def test_deleting_all_tables_does_not_seed_defaults_again(tmp_path):
+    table_path = tmp_path / "tables.json"
+    tables = TableService(table_path)
+    names = list(tables.list_tables())
+
+    for name in names:
+        tables.delete_table(name)
+
+    assert tables.list_tables() == {}
+    assert ReportingService.table_statuses(tables.list_tables(), []) == []
+    assert TableService(table_path).list_tables() == {}
+
+
+def test_only_managers_can_manage_tables():
+    class User:
+        def __init__(self, role):
+            self.role = role
+
+    assert can_manage_tables(User("Quản lý"))
+    assert not can_manage_tables(User("Nhân viên"))
+    assert not can_manage_tables(User("Thu ngân"))
+    assert not can_manage_tables(None)

@@ -15,16 +15,20 @@ def render_menu_editor(menu_service) -> None:
     st.subheader("Thêm món mới (Dành cho Quản lý)")
     with st.form("add_menu_item", clear_on_submit=True):
         col1, col2, col3 = st.columns([1, 2, 1])
-        item_id = col1.text_input("Mã món (VD: F006)").strip().upper()
-        name = col2.text_input("Tên món").strip()
-        price = col3.number_input("Giá (đ)", min_value=0, step=1000)
-        submitted = st.form_submit_button("Thêm vào thực đơn", type="primary")
+        item_id = col1.text_input("Mã món (VD: F006)", key="new_menu_code").strip().upper()
+        name = col2.text_input("Tên món", key="new_menu_name").strip()
+        price = col3.number_input("Giá (đ)", min_value=0, step=1000, key="new_menu_price")
+        submitted = st.form_submit_button(
+            "Thêm vào thực đơn",
+            type="primary",
+            key="add_menu_submit",
+        )
 
     if not submitted:
         return
 
     try:
-        new_item = menu_service.add_item(code=item_id, name=name, price=int(price))
+        new_item = menu_service.add_item(item_id, name=name, price=int(price))
         sync_menu_state()
         st.success(f"Đã lưu thành công món '{new_item.name}' vào hệ thống và cơ sở dữ liệu.")
         st.rerun()

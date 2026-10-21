@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from types import SimpleNamespace
 
 from src.shared.data_structures.queue import Queue
 from src.shared.data_structures.linked_list import LinkedList
@@ -124,7 +125,11 @@ def test_cancelling_cooking_order_removes_it_but_preserves_other_fifo_items(tmp_
     other = KitchenRequest("DH999", "F002", "Bánh mì", 1)
     kitchen.send_to_kitchen(other)
 
-    orders.cancel_order(cooking_order.order_id)
+    orders.cancel_order(
+        cooking_order.order_id,
+        "Khách đổi ý",
+        SimpleNamespace(role="Quản lý"),
+    )
 
     assert cooking_order.status == "CANCELLED"
     assert queue.list_requests() == [other]
@@ -244,7 +249,11 @@ def test_kitchen_service_restores_queue_order_and_status(tmp_path):
 def test_cancelling_order_removes_and_persists_kitchen_requests(tmp_path):
     order, orders, queue, kitchen, storage_path = _create_kitchen_workflow(tmp_path)
 
-    orders.cancel_order(order.order_id)
+    orders.cancel_order(
+        order.order_id,
+        "Khách đổi ý",
+        SimpleNamespace(role="Quản lý"),
+    )
 
     assert order.status == "CANCELLED"
     assert queue.is_empty()

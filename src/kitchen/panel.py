@@ -34,13 +34,17 @@ def render_kitchen_queue() -> None:
         cols[1].write(status_label(request.status))
 
         if request.status == "NEW" and cols[2].button(
-            "🔥 Bắt đầu nấu", key=f"cook_{index}", disabled=not is_current
+            "🔥 Bắt đầu nấu",
+            key=f"cook_{request.order_id}_{request.item_code}",
+            disabled=not is_current,
         ):
             st.session_state.kitchen_service.start(request.order_id, request.item_code)
             _refresh_order_status(request.order_id)
             st.rerun()
         elif request.status == "COOKING" and cols[2].button(
-            "✅ Đã hoàn thành", key=f"ready_{index}", disabled=not is_current
+            "✅ Đã hoàn thành",
+            key=f"ready_{request.order_id}_{request.item_code}",
+            disabled=not is_current,
         ):
             st.session_state.kitchen_service.complete(request.order_id, request.item_code)
             _refresh_order_status(request.order_id)

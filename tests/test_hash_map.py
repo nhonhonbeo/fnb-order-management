@@ -29,6 +29,18 @@ def test_hash_map_crud_and_resize():
     assert hmap.remove("F002") is False
 
 
+def test_hash_map_supports_mapping_access_and_defaults():
+    hmap = HashMap()
+    hmap.put("present", None)
+
+    assert hmap["present"] is None
+    assert hmap.get("missing", "fallback") == "fallback"
+    assert "present" in hmap
+    assert list(hmap) == ["present"]
+    assert len(hmap) == 1
+    assert hmap == {"present": None}
+
+
 def test_hash_table_separate_chaining():
     ht = HashTable(capacity=3)
     ht.insert("K1", "Val1")

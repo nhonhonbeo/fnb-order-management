@@ -58,10 +58,16 @@ Có thể cài dependency kiểm thử bằng `python -m pip install -r requirem
 ## Chức năng dự kiến
 
 - Quản lý thực đơn và tra cứu món theo mã.
-- Tạo đơn hàng, thêm món và gắn với bàn.
+- Quản lý có thể thêm bàn và xoá bàn trống không có đơn chưa thanh toán.
+- Tạo đơn hàng, sửa món/ghi chú/bàn và huỷ đơn có lý do theo phân quyền.
 - Đưa món vào hàng đợi bếp theo FIFO.
 - Theo dõi trạng thái bàn và tính tổng hóa đơn.
+- Đơn đã huỷ không thể thanh toán và không được tính vào thống kê bán hàng.
 
 `src/app.py` là entry point Streamlit duy nhất. Dữ liệu JSON tiếp tục nằm trong
 thư mục `data/`; cấu trúc thư mục mã nguồn không làm thay đổi vị trí hay định dạng
 các tệp dữ liệu hiện có.
+
+Danh sách bàn mặc định được khởi tạo khi `data/tables.json` chưa tồn tại. Nếu
+toàn bộ bàn bị xoá, tệp vẫn được giữ với danh sách rỗng nên các bàn mặc định
+không tự xuất hiện lại.

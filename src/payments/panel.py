@@ -20,7 +20,11 @@ def render_payment() -> None:
         f"{currency(st.session_state.billing_service.calculate_total(order))}": order
         for order in payable
     }
-    selected = st.selectbox("Chọn đơn cần thanh toán", list(choices.keys()))
+    selected = st.selectbox(
+        "Chọn đơn cần thanh toán",
+        list(choices.keys()),
+        key="payment_order",
+    )
     order = choices[selected]
 
     st.dataframe(
@@ -42,7 +46,11 @@ def render_payment() -> None:
     total_amount = st.session_state.billing_service.calculate_total(order)
     st.markdown(f"### Tổng thanh toán: {currency(total_amount)}")
 
-    if st.button("💵 Xác nhận thanh toán & In hóa đơn", type="primary"):
+    if st.button(
+        "💵 Xác nhận thanh toán & In hóa đơn",
+        type="primary",
+        key="confirm_payment",
+    ):
         try:
             payment, invoice = st.session_state.payment_service.checkout(order["id"])
             st.session_state.tables = st.session_state.table_service.list_tables()

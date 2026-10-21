@@ -1,3 +1,7 @@
+from collections.abc import Iterator, Mapping
+from typing import Any
+
+
 class KeyValuePair:
   """Lớp đại diện cho một cặp (Key, Value)"""
 
@@ -6,7 +10,7 @@ class KeyValuePair:
     self.value = value
 
 
-class HashMap:
+class HashMap(Mapping[Any, Any]):
   """Cài đặt HashMap sử dụng Địa chỉ mở (Open Addressing - Linear Probing)
 
   Tích hợp cơ chế tự động mở rộng mảng (Rehashing) khi đụng độ tăng cao.
@@ -74,22 +78,43 @@ class HashMap:
       # Nhích sang ô tiếp theo (dạng vòng tròn nhờ phép %)
       index = (index + 1) % self.capacity
 
-  def get(self, key):
-    """Tìm kiếm giá trị theo Key. Trả về None nếu không tìm thấy."""
+  def get(self, key, default=None):
+    """Tìm giá trị theo Key, trả về default nếu không tìm thấy."""
     index = self._hash(key)
 
     for _ in range(self.capacity):
       item = self.buckets[index]
 
       if item is None:
-        return None  # Gặp ô None nghĩa là Key chắc chắn không tồn tại
+        return default  # Gặp ô None nghĩa là Key chắc chắn không tồn tại
 
       if item is not HashMap.DELETED and item.key == key:
         return item.value
 
       index = (index + 1) % self.capacity
 
-    return None
+    return default
+
+  def __getitem__(self, key):
+    """Truy cập giá trị theo cú pháp mapping."""
+    missing = object()
+    value = self.get(key, missing)
+    if value is missing:
+      raise KeyError(key)
+    return value
+
+  def __iter__(self) -> Iterator[Any]:
+    for item in self.buckets:
+      if item is not None and item is not HashMap.DELETED:
+        yield item.key
+
+  def __len__(self) -> int:
+    return self.size
+
+  def __eq__(self, other: object) -> bool:
+    if not isinstance(other, Mapping) or len(self) != len(other):
+      return False
+    return all(key in other and value == other[key] for key, value in self.items())
 
   def remove(self, key):
     """Xóa Key khỏi HashMap. Trả về True nếu xóa thành công."""

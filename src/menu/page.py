@@ -16,7 +16,11 @@ def render():
         st.warning("Chưa khởi tạo MenuService trong hệ thống.")
         return
 
-    search = st.text_input("Tìm theo mã hoặc tên món", placeholder="Ví dụ: F001 hoặc phở")
+    search = st.text_input(
+        "Tìm theo mã hoặc tên món",
+        placeholder="Ví dụ: F001 hoặc phở",
+        key="menu_search",
+    )
     keyword = search.strip()
     
     try:
@@ -69,7 +73,10 @@ def render():
                         with st.form(key=f"edit_form_{item.code}"):
                             new_name = st.text_input("Tên món mới", value=item.name, key=f"edit_name_{item.code}")
                             new_price = st.number_input("Giá mới", value=float(item.price), min_value=0.0, step=1000.0, key=f"edit_price_{item.code}")
-                            submit_edit = st.form_submit_button("Lưu thay đổi")
+                            submit_edit = st.form_submit_button(
+                                "Lưu thay đổi",
+                                key=f"save_menu_{item.code}",
+                            )
                             if submit_edit:
                                 try:
                                     menu_service.update_item(

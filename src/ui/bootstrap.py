@@ -63,6 +63,10 @@ def initialise_state() -> None:
             table_service=st.session_state.table_service,
         )
 
+    st.session_state.table_service.set_orders_provider(
+        st.session_state.order_service.list_orders
+    )
+
     st.session_state.menu_service.set_order_service(st.session_state.order_service)
 
     if "kitchen_service" not in st.session_state:
@@ -74,6 +78,9 @@ def initialise_state() -> None:
         )
     else:
         st.session_state.kitchen_service.set_order_service(st.session_state.order_service)
+    st.session_state.order_service.set_kitchen_service(
+        st.session_state.kitchen_service
+    )
 
     if "billing_service" not in st.session_state:
         st.session_state.invoice_repository = InvoiceRepository(storage.invoices_storage)

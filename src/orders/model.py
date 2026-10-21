@@ -53,6 +53,9 @@ class Order:
         status: str = "NEW",
         items: Optional[List[OrderItem]] = None,
         created_at: Optional[str] = None,
+        note: str = "",
+        cancelled_at: Optional[str] = None,
+        cancel_reason: Optional[str] = None,
     ):
         self.order_id = str(order_id)
         self.table_id = table_id
@@ -61,6 +64,9 @@ class Order:
         self.created_at: Optional[str] = (
             created_at if created_at is not None else datetime.now().isoformat()
         )
+        self.note = note
+        self.cancelled_at = cancelled_at
+        self.cancel_reason = cancel_reason
 
     # Hàm thêm một món ăn vào đơn hàng
     def add_line(self, item_code: str, item_name: str, quantity: int, unit_price: int):
@@ -88,6 +94,9 @@ class Order:
             "table_id": self.table_id,
             "status": self.status,
             "created_at": self.created_at,
+            "note": self.note,
+            "cancelled_at": self.cancelled_at,
+            "cancel_reason": self.cancel_reason,
             "items": [item.to_dict() for item in self.items],
         }
 
@@ -105,6 +114,9 @@ class Order:
             status=data.get("status", "NEW"),
             items=items,
             created_at=data.get("created_at"),
+            note=data.get("note", ""),
+            cancelled_at=data.get("cancelled_at"),
+            cancel_reason=data.get("cancel_reason"),
         )
         if data.get("created_at") is None:
             order.created_at = None

@@ -14,6 +14,7 @@ STATUS = {
     "COOKING": ("Đang nấu", "cooking"),
     "READY": ("Đã phục vụ", "ready"),
     "PAID": ("Đã thanh toán", "paid"),
+    "CANCELLED": ("Đã huỷ", "cancelled"),
 }
 
 
@@ -80,7 +81,10 @@ def render():
     revenue = st.session_state.billing_service.get_total_revenue()
     col1, col2 = st.columns(2)
     col1.metric("Doanh thu", currency(revenue))
-    col2.metric("Tổng đơn hàng", len(orders))
+    col2.metric(
+        "Tổng đơn hàng",
+        sum(order.get("status") != "CANCELLED" for order in orders),
+    )
 
     st.subheader("Đơn hàng gần đây")
     if not orders:

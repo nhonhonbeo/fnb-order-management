@@ -9,9 +9,23 @@ def render_login_panel() -> None:
     st.caption("Nhập thông tin tài khoản để truy cập hệ thống quản lý")
 
     with st.form("login_form", clear_on_submit=False):
-        username = st.text_input("Tên đăng nhập", placeholder="Ví dụ: admin hoặc nhanvien").strip()
-        password = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu của bạn")
-        submit_login = st.form_submit_button("🚀 Đăng nhập", type="primary", use_container_width=True)
+        username = st.text_input(
+            "Tên đăng nhập",
+            placeholder="Ví dụ: admin hoặc nhanvien",
+            key="login_username",
+        ).strip()
+        password = st.text_input(
+            "Mật khẩu",
+            type="password",
+            placeholder="Nhập mật khẩu của bạn",
+            key="login_password",
+        )
+        submit_login = st.form_submit_button(
+            "🚀 Đăng nhập",
+            type="primary",
+            use_container_width=True,
+            key="login_submit",
+        )
 
     if submit_login:
         if not username or not password:
@@ -47,14 +61,14 @@ def render_login_panel() -> None:
     st.markdown("<div style='height: 10px'></div>", unsafe_allow_html=True)
     col_admin, col_staff = st.columns(2)
     with col_admin:
-        if st.button("⚡ Vào Admin", use_container_width=True):
+        if st.button("⚡ Vào Admin", use_container_width=True, key="quick_login_admin"):
             admin_user = st.session_state.auth_service.authenticate("admin", "admin123")
             if admin_user:
                 login_user(admin_user)
                 st.toast("Đăng nhập nhanh với quyền Quản lý!", icon="👑")
                 st.rerun()
     with col_staff:
-        if st.button("⚡ Vào Nhân viên", use_container_width=True):
+        if st.button("⚡ Vào Nhân viên", use_container_width=True, key="quick_login_staff"):
             staff_user = st.session_state.auth_service.authenticate("nhanvien", "123456")
             if staff_user:
                 login_user(staff_user)

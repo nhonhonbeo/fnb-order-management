@@ -4,6 +4,7 @@ from html import escape
 
 from src.ui.state import currency
 from src.ui.styles import inject_css
+from src.users.permissions import can_manage_tables
 
 from streamlit_autorefresh import st_autorefresh
 
@@ -23,7 +24,7 @@ def get_tables_status():
     )
 
 
-def _render_table_card(table):
+def _render_table_card(table, can_delete=False):
     style, _ = STATUS_STYLE.get(table["status"], STATUS_STYLE["Cần dọn"])
     total_line = f"Tạm tính: {currency(table['total'])}" if table["total"] is not None else "Chưa có đơn"
     st.markdown(
@@ -43,6 +44,60 @@ def _render_table_card(table):
         st.session_state.current_page = "Tạo đơn hàng"
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
+    if can_delete:
+        if st.button(
+            "Xoá bàn",
+            key=f"delete_table_{table['name']}",
+            use_container_width=True,
+        ):
+            st.session_state.pending_table_delete = table["name"]
+            st.rerun()
+
+
+def _render_table_management():
+    manager = can_manage_tables(st.session_state.get("authenticated_user"))
+    if not manager:
+        return
+
+    st.subheader("Quản lý bàn")
+    with st.form("add_table_form"):
+        table_name = st.text_input("Tên bàn", key="new_table_name")
+        submitted = st.form_submit_button("＋ Thêm bàn", key="add_table_submit")
+    if submitted:
+        try:
+            st.session_state.table_service.add_table(table_name)
+        except ValueError as error:
+            st.error(str(error))
+        else:
+            st.session_state.tables = st.session_state.table_service.list_tables()
+            st.success(f"Đã thêm bàn '{table_name.strip()}'")
+
+    pending_table = st.session_state.get("pending_table_delete")
+    if pending_table:
+        st.warning(f"Bạn có chắc muốn xoá bàn '{pending_table}' không?")
+        confirm_column, cancel_column = st.columns(2)
+        with confirm_column:
+            confirmed = st.button(
+                "Xác nhận xoá bàn",
+                key="confirm_delete_table",
+                type="primary",
+            )
+        with cancel_column:
+            cancelled = st.button("Huỷ", key="cancel_delete_table")
+        if confirmed:
+            try:
+                st.session_state.table_service.delete_table(pending_table)
+            except ValueError as error:
+                st.error(str(error))
+            else:
+                st.session_state.tables = st.session_state.table_service.list_tables()
+                if st.session_state.get("selected_table") == pending_table:
+                    st.session_state.selected_table = None
+                st.success(f"Đã xoá bàn '{pending_table}'")
+            st.session_state.pending_table_delete = None
+        elif cancelled:
+            st.session_state.pending_table_delete = None
+            st.rerun()
 
 
 ORDER_STATUS = {
@@ -50,6 +105,7 @@ ORDER_STATUS = {
     "COOKING": ("Đang nấu", "cooking"),
     "READY": ("Đã phục vụ", "ready"),
     "PAID": ("Đã thanh toán", "paid"),
+    "CANCELLED": ("Đã huỷ", "cancelled"),
 }
 
 
@@ -126,6 +182,7 @@ def _dashboard_alerts(orders):
 def render():
     inject_css()
     st_autorefresh(interval=30_000, key="dashboard_refresh")
+    manager = can_manage_tables(st.session_state.get("authenticated_user"))
 
     title_column, create_column, refresh_column = st.columns([4, 1.25, 1])
     with title_column:
@@ -141,6 +198,8 @@ def render():
         if st.button("🔄 Làm mới", use_container_width=True):
             st.rerun()
 
+    _render_table_management()
+
     orders = st.session_state.orders
     for alert in _dashboard_alerts(orders):
         st.markdown(f'<div class="alert-banner">⚠️ {escape(alert)}</div>', unsafe_allow_html=True)
@@ -152,8 +211,10 @@ def render():
     )
     st.markdown(f'<div class="table-legend">{legend}</div>', unsafe_allow_html=True)
     table_data = get_tables_status()
+    if not table_data:
+        st.info("Chưa có bàn. Quản lý có thể thêm bàn trong khu vực quản lý bàn.")
     for offset in range(0, len(table_data), 5):
         columns = st.columns(5)
         for column, table in zip(columns, table_data[offset : offset + 5]):
             with column:
-                _render_table_card(table)
+                _render_table_card(table, can_delete=manager)

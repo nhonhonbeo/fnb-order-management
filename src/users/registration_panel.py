@@ -9,10 +9,15 @@ def render_registration_panel() -> None:
     st.caption("Điền thông tin bên dưới để đăng ký nhân viên hoặc quản lý mới")
 
     with st.form("register_form", clear_on_submit=False):
-        reg_name = st.text_input("Họ và tên", placeholder="Ví dụ: Nguyễn Văn An").strip()
+        reg_name = st.text_input(
+            "Họ và tên",
+            placeholder="Ví dụ: Nguyễn Văn An",
+            key="register_full_name",
+        ).strip()
         reg_username = st.text_input(
             "Tên đăng nhập",
             placeholder="Chỉ gồm chữ cái, số (tối thiểu 3 ký tự)",
+            key="register_username",
         ).strip()
         reg_role = st.selectbox(
             "Vai trò / Vị trí",
@@ -23,16 +28,19 @@ def render_registration_panel() -> None:
             "Mật khẩu",
             type="password",
             placeholder="Tối thiểu 6 ký tự",
+            key="register_password",
         )
         reg_confirm = st.text_input(
             "Xác nhận mật khẩu",
             type="password",
             placeholder="Nhập lại mật khẩu phía trên",
+            key="register_confirm_password",
         )
         submit_register = st.form_submit_button(
             "✨ Hoàn tất đăng ký & Đăng nhập",
             type="primary",
             use_container_width=True,
+            key="register_submit",
         )
 
     if not submit_register:
