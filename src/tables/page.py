@@ -2,9 +2,9 @@ import streamlit as st
 from datetime import datetime
 from html import escape
 
-from src.ui.state import currency
+from src.ui.state import currency, refresh_order_table_state
 from src.ui.styles import inject_css
-from src.users.permissions import can_manage_tables
+from src.users.permissions import can_change_table, can_manage_tables
 
 from streamlit_autorefresh import st_autorefresh
 
@@ -24,7 +24,7 @@ def get_tables_status():
     )
 
 
-def _render_table_card(table, can_delete=False):
+def _render_table_card(table, can_delete=False, can_change=False):
     style, _ = STATUS_STYLE.get(table["status"], STATUS_STYLE["Cần dọn"])
     total_line = f"Tạm tính: {currency(table['total'])}" if table["total"] is not None else "Chưa có đơn"
     st.markdown(
@@ -52,6 +52,70 @@ def _render_table_card(table, can_delete=False):
         ):
             st.session_state.pending_table_delete = table["name"]
             st.rerun()
+    if can_change and table["status"] in {"Đang phục vụ", "Chờ thanh toán"}:
+        if st.button(
+            "Đổi bàn",
+            key=f"change_table_{table['name']}",
+            use_container_width=True,
+        ):
+            st.session_state.changing_table = table["name"]
+            st.rerun()
+
+
+def _render_change_table() -> None:
+    if not can_change_table(st.session_state.get("authenticated_user")):
+        return
+    source_table = st.session_state.get("changing_table")
+    if not source_table:
+        return
+
+    st.subheader(f"Đổi bàn: {source_table} →")
+    available_tables = st.session_state.table_service.available_tables()
+    if available_tables:
+        target_table = st.selectbox(
+            "Chọn bàn đang Trống",
+            available_tables,
+            key="change_table_target",
+        )
+    else:
+        target_table = None
+        st.info("Hiện không còn bàn trống để chuyển đơn.")
+
+    confirm_column, cancel_column = st.columns(2)
+    with confirm_column:
+        confirmed = st.button(
+            "Xác nhận",
+            key="confirm_change_table",
+            type="primary",
+            disabled=not available_tables,
+        )
+    with cancel_column:
+        cancelled = st.button("Hủy", key="cancel_change_table")
+
+    if cancelled:
+        st.session_state.pop("changing_table", None)
+        st.rerun()
+    if not confirmed or target_table is None:
+        return
+
+    try:
+        order = st.session_state.order_service.change_table(
+            source_table,
+            target_table,
+        )
+    except (ValueError, RuntimeError, OSError) as error:
+        st.error(str(error))
+        return
+
+    st.session_state.last_table_change_success = (
+        f"Đã chuyển đơn {order.order_id} từ {source_table} sang {target_table}"
+    )
+    st.session_state.pop("changing_table", None)
+    refresh_order_table_state(
+        st.session_state.order_service,
+        st.session_state.table_service,
+    )
+    st.rerun()
 
 
 def _render_table_management():
@@ -182,6 +246,9 @@ def _dashboard_alerts(orders):
 def render():
     inject_css()
     st_autorefresh(interval=30_000, key="dashboard_refresh")
+    success_message = st.session_state.pop("last_table_change_success", None)
+    if success_message:
+        st.success(success_message)
     manager = can_manage_tables(st.session_state.get("authenticated_user"))
 
     title_column, create_column, refresh_column = st.columns([4, 1.25, 1])
@@ -217,4 +284,11 @@ def render():
         columns = st.columns(5)
         for column, table in zip(columns, table_data[offset : offset + 5]):
             with column:
-                _render_table_card(table, can_delete=manager)
+                _render_table_card(
+                    table,
+                    can_delete=manager,
+                    can_change=can_change_table(
+                        st.session_state.get("authenticated_user")
+                    ),
+                )
+    _render_change_table()

@@ -2,8 +2,7 @@
 import streamlit as st
 
 from src.payments.service import PaymentError
-from src.ui.presenters import order_views
-from src.ui.state import currency
+from src.ui.state import currency, refresh_order_table_state
 
 
 def render_payment() -> None:
@@ -53,8 +52,10 @@ def render_payment() -> None:
     ):
         try:
             payment, invoice = st.session_state.payment_service.checkout(order["id"])
-            st.session_state.tables = st.session_state.table_service.list_tables()
-            st.session_state.orders = order_views(st.session_state.order_service.list_orders())
+            refresh_order_table_state(
+                st.session_state.order_service,
+                st.session_state.table_service,
+            )
             st.session_state.invoices = st.session_state.billing_service.list_invoices()
 
             st.success(

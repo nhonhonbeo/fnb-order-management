@@ -68,6 +68,115 @@ class OrderService:
     def list_orders(self) -> List[Order]:
         return list(self.orders.values())
 
+    def get_active_order_by_table(self, table_id: str) -> Order | None:
+        normalized_table_id = table_id.strip() if isinstance(table_id, str) else ""
+        if not normalized_table_id:
+            return None
+        matching_orders = [
+            order for order in self.orders.values()
+            if isinstance(order.table_id, str)
+            and order.table_id.strip() == normalized_table_id
+            and order.status not in {"PAID", "CANCELLED"}
+        ]
+        if len(matching_orders) > 1:
+            raise ValueError(
+                f"Có nhiều hơn một đơn đang hoạt động tại bàn '{normalized_table_id}'"
+            )
+        return matching_orders[0] if matching_orders else None
+
+    def active_table_ids(self) -> set[str]:
+        return {
+            order.table_id.strip()
+            for order in self.orders.values()
+            if isinstance(order.table_id, str)
+            and order.table_id.strip()
+            and order.status not in {"PAID", "CANCELLED"}
+        }
+
+    def change_table(self, from_table_id: str, to_table_id: str) -> Order:
+        if self.table_service is None:
+            raise ValueError("Chưa kết nối dịch vụ bàn")
+
+        with self.table_service.transaction():
+            self.load()
+            source_name = from_table_id.strip() if isinstance(from_table_id, str) else ""
+            target_name = to_table_id.strip() if isinstance(to_table_id, str) else ""
+            if not source_name:
+                raise ValueError("Đơn không có table_id để đổi bàn")
+            if not target_name:
+                raise ValueError("Bàn đích không tồn tại")
+            if source_name == target_name:
+                raise ValueError("Không thể đổi sang chính bàn hiện tại")
+
+            tables = self.table_service.list_tables()
+            normalized_tables = {
+                table_id.strip(): table_id for table_id in tables
+            }
+            source_table = normalized_tables.get(source_name)
+            target_table = normalized_tables.get(target_name)
+            if source_table is None:
+                raise ValueError(f"Bàn nguồn '{source_name}' không tồn tại")
+            if target_table is None:
+                raise ValueError(f"Bàn đích '{target_name}' không tồn tại")
+
+            matching_orders = [
+                order for order in self.orders.values()
+                if isinstance(order.table_id, str)
+                and order.table_id.strip() == source_name
+            ]
+            active_orders = [
+                order for order in matching_orders
+                if order.status not in {"PAID", "CANCELLED"}
+            ]
+            if len(active_orders) > 1:
+                raise ValueError(
+                    f"Có nhiều hơn một đơn đang hoạt động tại bàn '{source_name}'"
+                )
+            if not active_orders:
+                if any(order.status == "PAID" for order in matching_orders):
+                    raise ValueError("Đơn tại bàn nguồn đã thanh toán")
+                if any(order.status == "CANCELLED" for order in matching_orders):
+                    raise ValueError("Đơn tại bàn nguồn đã bị hủy")
+                raise ValueError(f"Bàn nguồn '{source_name}' không có đơn đang hoạt động")
+            order = active_orders[0]
+            if not order.table_id or not order.table_id.strip():
+                raise ValueError("Đơn không có table_id để đổi bàn")
+            if tables[target_table] != "Trống":
+                raise ValueError(f"Bàn đích '{target_table}' đang có khách")
+
+            original_orders = list(self.orders.values())
+            original_tables = dict(tables)
+            original_table_id = order.table_id
+            try:
+                self.table_service.reserve(target_table)
+                order.table_id = target_table
+                self.save()
+                self.table_service.release(source_table)
+            except Exception as error:
+                rollback_errors = []
+                order.table_id = original_table_id
+                try:
+                    self.repository.save_all(original_orders)
+                    self.orders = {
+                        original_order.order_id: original_order
+                        for original_order in original_orders
+                    }
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+                try:
+                    self.table_service.repository.save_all(original_tables)
+                    self.table_service._tables = original_tables
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+                if rollback_errors:
+                    details = "; ".join(str(failure) for failure in rollback_errors)
+                    raise OrderOperationRollbackError(
+                        "Đổi bàn thất bại và không thể khôi phục đầy đủ trạng thái: "
+                        f"{details}"
+                    ) from error
+                raise
+            return order
+
     def set_kitchen_service(self, kitchen_service: Any) -> None:
         self.kitchen_service = kitchen_service
 

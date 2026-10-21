@@ -12,6 +12,14 @@ def can_manage_tables(user: Any) -> bool:
     return user is not None and getattr(user, "role", None) == "Quản lý"
 
 
+def can_change_table(user: Any) -> bool:
+    return user is not None and getattr(user, "role", None) in {
+        "Quản lý",
+        "Thu ngân",
+        "Nhân viên",
+    }
+
+
 def can_view_revenue(user: Any) -> bool:
     return user is not None and getattr(user, "role", None) in {"Quản lý", "Thu ngân"}
 

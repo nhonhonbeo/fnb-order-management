@@ -1,4 +1,6 @@
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from types import SimpleNamespace
 
 import pytest
@@ -9,10 +11,11 @@ from src.menu.model import MenuItem
 from src.menu.service import DuplicateCodeError, ItemNotFoundError, MenuService
 from src.orders.model import Order
 from src.orders.service import OrderService
+from src.payments.billing_service import BillingService
 from src.payments.service import PaymentError, PaymentService
 from src.reports.service import ReportingService
 from src.tables.service import TableService
-from src.users.permissions import can_cancel_order, can_edit_order
+from src.users.permissions import can_cancel_order, can_change_table, can_edit_order
 
 
 def test_order_creation_and_item_addition(tmp_path):
@@ -538,7 +541,12 @@ def test_order_edit_and_cancel_permissions_are_role_aware():
     staff = SimpleNamespace(role="Nhân viên")
     manager = SimpleNamespace(role="Quản lý")
     cashier = SimpleNamespace(role="Thu ngân")
+    chef = SimpleNamespace(role="Đầu bếp")
 
+    assert can_change_table(staff)
+    assert can_change_table(manager)
+    assert can_change_table(cashier)
+    assert not can_change_table(chef)
     assert can_edit_order(staff, order)
     assert can_edit_order(manager, order)
     assert not can_edit_order(cashier, order)
@@ -593,3 +601,258 @@ def test_order_search_filters_and_history_sorting(tmp_path):
     assert [order.order_id for order in service.list_history()] == [
         "DH005", "DH004", "DH006", "DH007",
     ]
+
+
+def _table_change_services(tmp_path):
+    table_service = TableService(tmp_path / "tables.json")
+    for table_name in ("Bàn A", "Bàn B", "Bàn C"):
+        table_service.add_table(table_name)
+    order_service = OrderService(
+        storage_or_path=tmp_path / "orders.json",
+        table_service=table_service,
+    )
+    return table_service, order_service
+
+
+def _create_seated_order(table_service, order_service, table_name, status="NEW"):
+    order = order_service.create_order(table_name)
+    order.status = status
+    order_service.save()
+    table_service.reserve(table_name)
+    return order
+
+
+def test_change_table_and_chain_then_checkout_releases_current_table(tmp_path):
+    tables, orders = _table_change_services(tmp_path)
+    menu = MenuService(tmp_path / "menu.json")
+    menu.add_item("F001", "Phở bò", 45000)
+    menu.add_item("F002", "Bánh mì", 25000)
+    orders.menu = menu
+    queue = OrderQueue()
+    orders.queue = queue
+    kitchen = KitchenService(queue, tmp_path / "kitchen.json", orders)
+    orders.set_kitchen_service(kitchen)
+    order = _create_seated_order(tables, orders, "Bàn A")
+    order.table_id = " Bàn A "
+    orders.save()
+    orders.add_item(order.order_id, "F001", 1)
+    orders.add_item(order.order_id, "F002", 1)
+    orders.send_to_kitchen(order.order_id)
+    kitchen.start(order.order_id, "F001")
+    queue_before = [
+        (item.order_id, item.item_code, item.status)
+        for item in kitchen.list_requests()
+    ]
+
+    changed_order = orders.change_table(" Bàn A ", " Bàn B ")
+    assert changed_order.order_id == order.order_id
+    assert (changed_order.table_id, tables.list_tables()["Bàn A"], tables.list_tables()["Bàn B"]) == (
+        "Bàn B", "Trống", "Đang phục vụ",
+    )
+    changed_order = orders.change_table("Bàn B", "Bàn C")
+    assert (changed_order.table_id, tables.list_tables()["Bàn B"], tables.list_tables()["Bàn C"]) == (
+        "Bàn C", "Trống", "Đang phục vụ",
+    )
+    assert [
+        (item.order_id, item.item_code, item.status)
+        for item in kitchen.list_requests()
+    ] == queue_before
+
+    restored_tables = TableService(tmp_path / "tables.json")
+    restored_orders = OrderService(
+        storage_or_path=tmp_path / "orders.json",
+        table_service=restored_tables,
+    )
+    assert restored_orders.get_order(order.order_id).table_id == "Bàn C"
+    assert restored_tables.list_tables()["Bàn C"] == "Đang phục vụ"
+
+    restored_kitchen = KitchenService(
+        OrderQueue(),
+        tmp_path / "kitchen.json",
+        restored_orders,
+    )
+    assert [
+        (item.order_id, item.item_code, item.status)
+        for item in restored_kitchen.list_requests()
+    ] == queue_before
+    restored_kitchen.complete(order.order_id, "F001")
+    restored_kitchen.start(order.order_id, "F002")
+    restored_kitchen.complete(order.order_id, "F002")
+    billing = BillingService(tmp_path / "invoices.json")
+    payments = PaymentService(
+        restored_orders,
+        tmp_path / "payments.json",
+        billing_service=billing,
+        table_service=restored_tables,
+        kitchen_service=restored_kitchen,
+    )
+    _, invoice = payments.checkout(order.order_id)
+    assert invoice.table_id == "Bàn C"
+    assert restored_tables.list_tables()["Bàn A"] == "Trống"
+    assert restored_tables.list_tables()["Bàn B"] == "Trống"
+    assert restored_tables.list_tables()["Bàn C"] == "Trống"
+
+
+def test_change_table_then_checkout_saves_invoice_with_destination_table(tmp_path):
+    tables, orders = _table_change_services(tmp_path)
+    menu = MenuService(tmp_path / "menu.json")
+    menu.add_item("F001", "Phở bò", 45000)
+    orders.menu = menu
+    queue = OrderQueue()
+    orders.queue = queue
+    kitchen = KitchenService(queue, tmp_path / "kitchen.json", orders)
+    orders.set_kitchen_service(kitchen)
+    order = _create_seated_order(tables, orders, "Bàn A")
+    orders.add_item(order.order_id, "F001", 1)
+    order.status = "COMPLETED"
+    orders.save()
+    orders.change_table("Bàn A", "Bàn B")
+    billing = BillingService(tmp_path / "invoices.json")
+    payments = PaymentService(
+        orders,
+        tmp_path / "payments.json",
+        billing_service=billing,
+        table_service=tables,
+        kitchen_service=kitchen,
+    )
+
+    _, invoice = payments.checkout(order.order_id)
+
+    assert invoice.table_id == "Bàn B"
+    assert tables.list_tables()["Bàn A"] == "Trống"
+    assert tables.list_tables()["Bàn B"] == "Trống"
+
+
+def test_change_table_save_failure_rolls_back_order_and_both_files(
+    tmp_path,
+    monkeypatch,
+):
+    tables, orders = _table_change_services(tmp_path)
+    order = _create_seated_order(tables, orders, "Bàn A")
+    original_order_file = (tmp_path / "orders.json").read_bytes()
+    original_table_file = (tmp_path / "tables.json").read_bytes()
+
+    def fail_save():
+        raise OSError("disk full")
+
+    monkeypatch.setattr(orders, "save", fail_save)
+    with pytest.raises(OSError, match="disk full"):
+        orders.change_table("Bàn A", "Bàn B")
+
+    assert order.table_id == "Bàn A"
+    assert tables.list_tables()["Bàn A"] == "Đang phục vụ"
+    assert tables.list_tables()["Bàn B"] == "Trống"
+    saved_order = OrderService(storage_or_path=tmp_path / "orders.json")
+    assert saved_order.get_order(order.order_id).table_id == "Bàn A"
+    assert (tmp_path / "orders.json").read_bytes() == original_order_file
+    assert (tmp_path / "tables.json").read_bytes() == original_table_file
+
+
+@pytest.mark.parametrize(
+    ("source", "target", "status", "expected_error"),
+    [
+        ("Bàn A", "Bàn A", "NEW", "chính bàn"),
+        ("Bàn A", "Bàn thiếu", "NEW", "không tồn tại"),
+        ("Bàn rỗng", "Bàn B", "NEW", "không có đơn đang hoạt động"),
+        ("Bàn A", "Bàn B", "PAID", "đã thanh toán"),
+        ("Bàn A", "Bàn B", "CANCELLED", "đã bị hủy"),
+    ],
+)
+def test_change_table_reports_invalid_source_and_target(
+    tmp_path,
+    source,
+    target,
+    status,
+    expected_error,
+):
+    tables, orders = _table_change_services(tmp_path)
+    if source != "Bàn rỗng":
+        _create_seated_order(tables, orders, source, status=status)
+    else:
+        tables.add_table(source)
+
+    with pytest.raises(ValueError, match=expected_error):
+        orders.change_table(source, target)
+
+
+def test_change_table_rejects_occupied_target_and_missing_source_table(tmp_path):
+    tables, orders = _table_change_services(tmp_path)
+    _create_seated_order(tables, orders, "Bàn A")
+    _create_seated_order(tables, orders, "Bàn B")
+
+    with pytest.raises(ValueError, match="đang có khách"):
+        orders.change_table("Bàn A", "Bàn B")
+    with pytest.raises(ValueError, match="Bàn nguồn.*không tồn tại"):
+        orders.change_table("Bàn thiếu", "Bàn C")
+
+
+def test_change_table_requires_source_order_table_id(tmp_path):
+    tables, orders = _table_change_services(tmp_path)
+    order = orders.create_order(None)
+
+    with pytest.raises(ValueError, match="không có table_id"):
+        orders.change_table(None, "Bàn A")
+    assert order.table_id is None
+    assert tables.list_tables()["Bàn A"] == "Trống"
+
+
+@pytest.mark.parametrize("status", ["NEW", "IN_PROGRESS", "COMPLETED"])
+def test_change_table_accepts_each_unpaid_order_status(tmp_path, status):
+    tables, orders = _table_change_services(tmp_path)
+    order = _create_seated_order(tables, orders, "Bàn A", status=status)
+
+    changed_order = orders.change_table("Bàn A", "Bàn B")
+
+    assert changed_order.order_id == order.order_id
+    assert changed_order.table_id == "Bàn B"
+
+
+def test_active_order_queries_normalize_table_names_and_detect_bad_data(tmp_path):
+    _, orders = _table_change_services(tmp_path)
+    first = orders.create_order(" Bàn A ")
+    second = orders.create_order("Bàn A")
+
+    assert orders.active_table_ids() == {"Bàn A"}
+    with pytest.raises(ValueError, match="nhiều hơn một"):
+        orders.get_active_order_by_table(" Bàn A ")
+
+    second.status = "PAID"
+    assert orders.get_active_order_by_table("Bàn A") is first
+    assert orders.active_table_ids() == {"Bàn A"}
+    first.status = "CANCELLED"
+    assert orders.get_active_order_by_table("Bàn A") is None
+    assert orders.active_table_ids() == set()
+
+
+def test_two_order_services_cannot_claim_same_destination_table(tmp_path):
+    first_tables, first_orders = _table_change_services(tmp_path)
+    _create_seated_order(first_tables, first_orders, "Bàn A")
+    _create_seated_order(first_tables, first_orders, "Bàn B")
+    second_tables = TableService(tmp_path / "tables.json")
+    second_orders = OrderService(
+        storage_or_path=tmp_path / "orders.json",
+        table_service=second_tables,
+    )
+    barrier = Barrier(2)
+
+    def change(order_service, source):
+        barrier.wait()
+        try:
+            order_service.change_table(source, "Bàn C")
+            return "success"
+        except ValueError as error:
+            return str(error)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(
+            lambda args: change(*args),
+            [
+                (first_orders, "Bàn A"),
+                (second_orders, "Bàn B"),
+            ],
+        ))
+
+    assert sum(result == "success" for result in results) == 1
+    assert sum(isinstance(result, str) and "đang có khách" in result for result in results) == 1
+    final_orders = OrderService(storage_or_path=tmp_path / "orders.json").list_orders()
+    assert sum(order.table_id == "Bàn C" for order in final_orders) == 1

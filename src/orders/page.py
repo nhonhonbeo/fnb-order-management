@@ -1,8 +1,11 @@
 import streamlit as st
 
-from src.ui.state import currency, get_current_user
+from src.ui.state import (
+    currency,
+    get_current_user,
+    refresh_order_table_state,
+)
 from src.ui.styles import inject_css
-from src.ui.presenters import order_views
 from src.users.permissions import can_cancel_order, can_edit_order
 
 
@@ -13,11 +16,6 @@ STATUS_LABELS = {
     "PAID": "Đã thanh toán",
     "CANCELLED": "Đã huỷ",
 }
-
-
-def _refresh_order_state(order_service, table_service):
-    st.session_state.orders = order_views(order_service.list_orders())
-    st.session_state.tables = table_service.list_tables()
 
 
 def _render_create_order():
@@ -115,7 +113,7 @@ def _render_create_order():
     ):
         try:
             order = order_service.create_order_from_cart(table, cart)
-            _refresh_order_state(order_service, table_service)
+            refresh_order_table_state(order_service, table_service)
             st.session_state.cart = []
             st.session_state.pop("selected_table", None)
             st.success(
@@ -207,7 +205,7 @@ def _render_edit_form(order, user, order_service, table_service):
             note=note,
             table_id=selected_table,
         )
-        _refresh_order_state(order_service, table_service)
+        refresh_order_table_state(order_service, table_service)
         st.success(f"Đã cập nhật đơn {order.order_id}.")
         st.rerun()
     except (ValueError, RuntimeError, OSError) as error:
@@ -238,7 +236,7 @@ def _render_cancel_form(order, user, order_service, table_service):
         return
     try:
         order_service.cancel_order(order.order_id, reason, user)
-        _refresh_order_state(order_service, table_service)
+        refresh_order_table_state(order_service, table_service)
         st.session_state.pop(cancel_key, None)
         st.success(f"Đơn {order.order_id} đã được huỷ.")
     except (ValueError, RuntimeError, OSError) as error:

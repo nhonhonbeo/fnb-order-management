@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,21 @@ def isolated_app(tmp_path, monkeypatch):
         for path in source_data.rglob("*")
         if path.is_file()
     }
+    (copied_data / "orders.json").write_text("[]\n", encoding="utf-8")
+    (copied_data / "kitchen.json").write_text(
+        '{"requests": [], "queue": []}\n',
+        encoding="utf-8",
+    )
+    (copied_data / "invoices.json").write_text("[]\n", encoding="utf-8")
+    (copied_data / "payments.json").write_text("[]\n", encoding="utf-8")
+    (copied_data / "tables.json").write_text(
+        json.dumps(
+            {f"Bàn {index}": "Trống" for index in range(1, 11)},
+            ensure_ascii=False,
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
     monkeypatch.setattr(bootstrap, "DATA_DIR", copied_data)
 
     app = AppTest.from_file(ROOT / "src" / "app.py", default_timeout=30).run()

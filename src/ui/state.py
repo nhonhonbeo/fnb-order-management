@@ -5,9 +5,10 @@ from typing import Any
 from uuid import uuid4
 
 import streamlit as st
-from src.ui.presenters import menu_item_view
+
 from src.payments.billing_service import BillingService
 from src.shared.money import to_vnd
+from src.ui.presenters import menu_item_view, order_views
 
 def sync_menu_state() -> None:
     """Đồng bộ danh sách thực đơn từ MenuService sang Session State."""
@@ -15,6 +16,12 @@ def sync_menu_state() -> None:
         menu_item_view(item)
         for item in st.session_state.menu_service.list_items(only_active=False)
     ]
+
+
+def refresh_order_table_state(order_service: Any, table_service: Any) -> None:
+    """Refresh the session snapshots used by order and table pages."""
+    st.session_state.orders = order_views(order_service.list_orders())
+    st.session_state.tables = table_service.list_tables()
 
 
 def login_user(user: Any) -> None:

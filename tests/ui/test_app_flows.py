@@ -19,6 +19,23 @@ def _texts(elements):
     return [element.value for element in elements]
 
 
+def _seed_serving_order(app):
+    available_tables = app.session_state.table_service.available_tables()
+    assert len(available_tables) >= 2
+    source, target = available_tables[:2]
+    order = app.session_state.order_service.create_order(source)
+    app.session_state.table_service.reserve(source)
+    from src.ui.state import refresh_order_table_state
+
+    refresh_order_table_state(
+        app.session_state.order_service,
+        app.session_state.table_service,
+    )
+    app.run()
+    assert not app.exception, [exception.message for exception in app.exception]
+    return order, source, target
+
+
 def test_login_rejects_bad_password_accepts_valid_and_logs_out(isolated_app):
     app = isolated_app
     element_by_key(app, "text_input", "login_username").set_value("admin")
@@ -153,7 +170,8 @@ def test_manager_can_add_and_confirm_deletion_of_table(isolated_app, login_as):
 def test_order_edit_cancel_kitchen_fifo_and_payment_flow(isolated_app, login_as):
     app = login_as(isolated_app, "Quản lý")
     _navigate(app, "Tạo đơn hàng")
-    element_by_key(app, "selectbox", "new_order_table").set_value("Bàn 1")
+    table_name = element_by_key(app, "selectbox", "new_order_table").options[0]
+    element_by_key(app, "selectbox", "new_order_table").set_value(table_name)
     item_select = element_by_key(app, "selectbox", "new_order_menu_item")
     item_select.set_value(next(option for option in item_select.options if "F001" in option))
     element_by_key(app, "number_input", "new_order_quantity").set_value(1)
@@ -210,7 +228,7 @@ def test_order_edit_cancel_kitchen_fifo_and_payment_flow(isolated_app, login_as)
     element_by_key(app, "button", "confirm_payment").click().run()
     assert order.status == "PAID"
     assert len(app.session_state.billing_service.list_invoices()) == invoice_count + 1
-    assert app.session_state.table_service.is_available("Bàn 1")
+    assert app.session_state.table_service.is_available(table_name)
     assert any(
         "Hiện không có đơn hàng nào chờ thanh toán" in value
         for value in _texts(app.info)
@@ -220,7 +238,8 @@ def test_order_edit_cancel_kitchen_fifo_and_payment_flow(isolated_app, login_as)
 def test_order_edit_and_cancel_controls_are_wired_to_services(isolated_app, login_as):
     app = login_as(isolated_app, "Quản lý")
     _navigate(app, "Tạo đơn hàng")
-    element_by_key(app, "selectbox", "new_order_table").set_value("Bàn 2")
+    table_name = element_by_key(app, "selectbox", "new_order_table").options[0]
+    element_by_key(app, "selectbox", "new_order_table").set_value(table_name)
     item_select = element_by_key(app, "selectbox", "new_order_menu_item")
     item_select.set_value(next(option for option in item_select.options if "F001" in option))
     element_by_key(app, "button", "add_to_cart").click().run()
@@ -237,9 +256,70 @@ def test_order_edit_and_cancel_controls_are_wired_to_services(isolated_app, logi
     element_by_key(app, "button", f"confirm_cancel_{order.order_id}").click().run()
     assert order.status == "CANCELLED"
     assert order.cancel_reason == "Khách đổi ý"
-    assert app.session_state.table_service.is_available("Bàn 2")
+    assert app.session_state.table_service.is_available(table_name)
     assert all(
         request.order_id != order.order_id
         for request in app.session_state.kitchen_service.list_requests()
     )
     assert any(f"Đơn {order.order_id} đã được huỷ" in value for value in _texts(app.success))
+
+
+def test_staff_can_change_table_and_table_cards_refresh(isolated_app, login_as):
+    app = login_as(isolated_app, "Nhân viên")
+    order, source, target = _seed_serving_order(app)
+
+    element_by_key(app, "button", f"change_table_{source}").click().run()
+    assert app.session_state.changing_table == source
+    element_by_key(app, "selectbox", "change_table_target").set_value(target)
+    element_by_key(app, "button", "confirm_change_table").click().run()
+
+    assert not app.exception, [exception.message for exception in app.exception]
+    assert any(
+        f"Đã chuyển đơn {order.order_id} từ {source} sang {target}" in value
+        for value in _texts(app.success)
+    )
+    assert app.session_state.order_service.get_order(order.order_id).table_id == target
+    assert app.session_state.tables[source] == "Trống"
+    assert app.session_state.tables[target] == "Đang phục vụ"
+    assert any(
+        view["table"] == target
+        for view in app.session_state.orders
+        if view["id"] == order.order_id
+    )
+    assert "changing_table" not in app.session_state
+
+
+def test_chef_cannot_change_table(isolated_app, login_as):
+    app = login_as(isolated_app, "Đầu bếp")
+    _seed_serving_order(app)
+
+    assert not any(
+        button.key is not None and button.key.startswith("change_table_")
+        for button in app.button
+    )
+
+
+def test_change_table_error_keeps_controls_and_shows_service_message(
+    isolated_app,
+    login_as,
+    monkeypatch,
+):
+    app = login_as(isolated_app, "Nhân viên")
+    _, source, target = _seed_serving_order(app)
+    element_by_key(app, "button", f"change_table_{source}").click().run()
+
+    def fail_change(_source, _target):
+        raise ValueError("Bàn đích đang có khách")
+
+    monkeypatch.setattr(
+        app.session_state.order_service,
+        "change_table",
+        fail_change,
+    )
+    element_by_key(app, "selectbox", "change_table_target").set_value(target)
+    element_by_key(app, "button", "confirm_change_table").click().run()
+
+    assert not app.exception, [exception.message for exception in app.exception]
+    assert any("Bàn đích đang có khách" in value for value in _texts(app.error))
+    assert app.session_state.changing_table == source
+    assert any(button.key == "confirm_change_table" for button in app.button)
