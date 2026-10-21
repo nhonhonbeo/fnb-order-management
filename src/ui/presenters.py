@@ -1,4 +1,4 @@
-"""Chuyển domain models thành dữ liệu ổn định cho các trang Streamlit."""
+-"""Chuyển domain models thành dữ liệu ổn định cho các trang Streamlit."""
 from collections.abc import Mapping
 from typing import Any
 
