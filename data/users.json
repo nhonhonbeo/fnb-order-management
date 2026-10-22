@@ -68,5 +68,19 @@
     "full_name": "thang nhan vien",
     "role": "Nhân viên",
     "created_at": "2026-10-17T08:41:12.478461"
+  },
+  {
+    "username": "thaoo",
+    "password_hash": "68453c9dfd60a99ea594bdf347e61bcc$100000$47883f7c24b80d685e06f0d07cafd367da606fda1649e5d8a289519ea80bfe85",
+    "full_name": "Phạm  Thị Thu Thảo",
+    "role": "Quản lý",
+    "created_at": "2026-10-22T20:21:04.317829"
+  },
+  {
+    "username": "thaooo",
+    "password_hash": "6ea4a415f0aea0e2fe99665d4ff5efa1$100000$21eb6e7b6fb61e903b19065b0d664dc13a9ee2f39be436e04b6502412387b763",
+    "full_name": "Phạm  Thị Thu Thảo",
+    "role": "Quản lý",
+    "created_at": "2026-10-22T21:06:56.664267"
   }
 ]
