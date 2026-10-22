@@ -68,5 +68,19 @@
     "full_name": "thang nhan vien",
     "role": "Nhân viên",
     "created_at": "2026-10-17T08:41:12.478461"
+  },
+  {
+    "username": "nhanvien1",
+    "password_hash": "25115d7e2a1f117d7ef7e370c40a6952$100000$abd0f91e8957bad50897338b0f271dd3cc2458a4f8e8e795fd830dd9d6861a77",
+    "full_name": "nguyễn nhân viên",
+    "role": "Nhân viên",
+    "created_at": "2026-10-21T23:33:47.580423"
+  },
+  {
+    "username": "daubep1",
+    "password_hash": "a54970170e5e444d2ae94922d43f2f77$100000$23a9de8986ee08342e703a584090cb7bebc1b77495483f79375a10c55c38cec4",
+    "full_name": "phan đầu bếp",
+    "role": "Đầu bếp",
+    "created_at": "2026-10-21T23:35:27.646400"
   }
 ]
