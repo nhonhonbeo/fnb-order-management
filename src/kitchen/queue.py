@@ -1,4 +1,6 @@
-"""FIFO queue và yêu cầu chế biến trong bếp."""
+"""FIFO queue và yêu cầu chế biến trong bếp kết hợp SPTF cho món ăn."""
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional
 
@@ -15,6 +17,8 @@ class KitchenRequest:
     item_code: str
     item_name: str
     quantity: int
+    processing_time: int = 5  # Thêm thời gian hoàn thành (phút) phục vụ thuật toán SPTF
+    created_at: str = ""      # Thời gian tạo hóa đơn (dùng cho quy tắc FIFO hóa đơn)
     status: str = "NEW"
 
 
@@ -41,6 +45,7 @@ class OrderQueue:
                 "đã có trong hàng đợi"
             )
         self._items.enqueue(request)
+        self._sort_queue()  # Tự động sắp xếp lại theo FIFO (hóa đơn) + SPTF (món) sau khi thêm
         self._notify_change("enqueue", request)
 
     def dequeue(self) -> KitchenRequest:
@@ -62,7 +67,25 @@ class OrderQueue:
         return self._items.size()
 
     def list_requests(self) -> List[KitchenRequest]:
-        return list(self._items)
+        """
+        Trả về danh sách yêu cầu đã được sắp xếp theo chuẩn:
+        1. FIFO đối với hóa đơn (created_at từ cũ đến mới).
+        2. SPTF đối với món trong cùng hóa đơn (processing_time từ ngắn đến dài).
+        """
+        items_list = list(self._items)
+        # Sắp xếp kết hợp: order_id/created_at trước (FIFO), sau đó đến processing_time (SPTF)
+        sorted_items = sorted(
+            items_list,
+            key=lambda req: (req.created_at if req.created_at else "", req.processing_time)
+        )
+        return sorted_items
+
+    def _sort_queue(self) -> None:
+        """Hỗn hợp sắp xếp lại cấu trúc Queue bên trong."""
+        sorted_list = self.list_requests()
+        self._items = Queue()
+        for req in sorted_list:
+            self._items.enqueue(req)
 
     def remove_by_order(self, order_id: str) -> None:
         new_items = Queue()
@@ -76,7 +99,10 @@ class OrderQueue:
         keys = [(request.order_id, request.item_code) for request in requests]
         if len(keys) != len(set(keys)):
             raise ValueError("Hàng đợi không thể chứa yêu cầu trùng")
+        
         self._items = Queue()
         for request in requests:
             self._items.enqueue(request)
-        self._notify_change("replace_all", list(requests))
+        
+        self._sort_queue()  # Sắp xếp lại ngay sau khi thay thế toàn bộ
+        self._notify_change("replace_all", self.list_requests())
