@@ -1,19 +1,19 @@
 import pytest
 import json
 
-from src.kitchen.queue import OrderQueue
-from src.kitchen.repository import KitchenRepository
-from src.kitchen.service import KitchenService
-from src.menu.model import MenuItem
-from src.menu.repository import MenuRepository
-from src.menu.service import MenuService
-from src.orders.repository import OrderRepository
-from src.orders.service import OrderService
-from src.payments.payment_repository import PaymentRepository
-from src.payments.service import PaymentService
+from src.features.kitchen.queue import OrderQueue
+from src.features.kitchen.repository import KitchenRepository
+from src.features.kitchen.service import KitchenService
+from src.features.menu.model import MenuItem
+from src.features.menu.repository import MenuRepository
+from src.features.menu.service import MenuService
+from src.features.orders.repository import OrderRepository
+from src.features.orders.service import OrderService
+from src.features.payments.payment_repository import PaymentRepository
+from src.features.payments.service import PaymentService
 from src.shared.repository import RepositoryDataError
-from src.storage.json_storage import InvalidJsonFileError, JsonStorage, StorageManager
-from src.tables.repository import TableRepository
+from src.features.storage.json_storage import InvalidJsonFileError, JsonStorage, StorageManager
+from src.features.tables.repository import TableRepository
 
 
 def test_save_and_load_json_with_utf8_and_nested_path(tmp_path):

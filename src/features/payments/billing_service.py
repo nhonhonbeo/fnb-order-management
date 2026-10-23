@@ -4,8 +4,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, List, Optional
 
-from src.payments.invoice_repository import InvoiceRepository
-from src.payments.invoice import Invoice
+from src.features.payments.invoice_repository import InvoiceRepository
+from src.features.payments.invoice import Invoice
 from src.shared.money import to_vnd, to_whole_vnd
 
 

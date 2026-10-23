@@ -1,7 +1,7 @@
 """Form quản lý thêm món vào thực đơn."""
 import streamlit as st
 
-from src.menu.service import DuplicateCodeError
+from src.features.menu.service import DuplicateCodeError
 from src.ui.state import get_current_user, sync_menu_state
 from src.users.permissions import can_manage_menu
 

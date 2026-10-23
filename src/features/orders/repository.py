@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from src.shared.repository import JsonListRepository, RepositoryDataError
-from src.storage.json_storage import JsonStorage
-from src.orders.model import Order
+from src.features.storage.json_storage import JsonStorage
+from src.features.orders.model import Order
 
 
 class OrderRepository(JsonListRepository[Order]):
@@ -15,7 +15,7 @@ class OrderRepository(JsonListRepository[Order]):
     required_fields = ("order_id",)
 
     def __init__(self, storage_or_path: Any = None):
-        default_path = Path(__file__).resolve().parents[2] / "data" / "orders.json"
+        default_path = Path(__file__).resolve().parents[3] / "data" / "orders.json"
         if storage_or_path is None:
             storage = JsonStorage(default_path)
         elif isinstance(storage_or_path, JsonStorage):

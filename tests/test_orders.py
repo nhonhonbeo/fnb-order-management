@@ -5,16 +5,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.kitchen.queue import OrderQueue
-from src.kitchen.service import KitchenService
-from src.menu.model import MenuItem
-from src.menu.service import DuplicateCodeError, ItemNotFoundError, MenuService
-from src.orders.model import Order
-from src.orders.service import OrderService
-from src.payments.billing_service import BillingService
-from src.payments.service import PaymentError, PaymentService
+from src.features.kitchen.queue import OrderQueue
+from src.features.kitchen.service import KitchenService
+from src.features.menu.model import MenuItem
+from src.features.menu.service import DuplicateCodeError, ItemNotFoundError, MenuService
+from src.features.orders.model import Order
+from src.features.orders.service import OrderService
+from src.features.payments.billing_service import BillingService
+from src.features.payments.service import PaymentError, PaymentService
 from src.reports.service import ReportingService
-from src.tables.service import TableService
+from src.features.tables.service import TableService
 from src.users.permissions import can_cancel_order, can_change_table, can_edit_order
 
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 from typing import Any, List, Optional
 from uuid import uuid4
 
-from src.payments.payment_repository import PaymentRepository
-from src.payments.payment import Payment, PaymentStatus
+from src.features.payments.payment_repository import PaymentRepository
+from src.features.payments.payment import Payment, PaymentStatus
 from src.shared.money import to_whole_vnd
 
 

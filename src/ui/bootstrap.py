@@ -5,21 +5,21 @@ from pathlib import Path
 
 import streamlit as st
 
-from src.kitchen.queue import KitchenRequest, OrderQueue
-from src.kitchen.repository import KitchenRepository
-from src.kitchen.service import KitchenService
-from src.menu.repository import MenuRepository
-from src.menu.service import MenuService
-from src.orders.repository import OrderRepository
-from src.orders.service import OrderService
-from src.payments.billing_service import BillingService
-from src.payments.invoice_repository import InvoiceRepository
-from src.payments.payment_repository import PaymentRepository
-from src.payments.service import PaymentService
+from src.features.kitchen.queue import KitchenRequest, OrderQueue
+from src.features.kitchen.repository import KitchenRepository
+from src.features.kitchen.service import KitchenService
+from src.features.menu.repository import MenuRepository
+from src.features.menu.service import MenuService
+from src.features.orders.repository import OrderRepository
+from src.features.orders.service import OrderService
+from src.features.payments.billing_service import BillingService
+from src.features.payments.invoice_repository import InvoiceRepository
+from src.features.payments.payment_repository import PaymentRepository
+from src.features.payments.service import PaymentService
 from src.reports.service import ReportingService
-from src.storage.json_storage import StorageManager
-from src.tables.repository import TableRepository
-from src.tables.service import TableService
+from src.features.storage.json_storage import StorageManager
+from src.features.tables.repository import TableRepository
+from src.features.tables.service import TableService
 from src.users.repository import UserRepository
 from src.users.service import AuthService
 from src.ui.presenters import menu_item_view, order_views

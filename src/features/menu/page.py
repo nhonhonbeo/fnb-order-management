@@ -2,7 +2,7 @@ import streamlit as st
 
 from src.ui.state import currency
 from src.ui.styles import inject_css
-from src.menu.editor import render_menu_editor
+from src.features.menu.editor import render_menu_editor
 from src.users.permissions import can_manage_menu
 
 

@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from src.shared.repository import JsonListRepository, RepositoryDataError
-from src.storage.json_storage import JsonStorage
-from src.payments.invoice import Invoice
+from src.features.storage.json_storage import JsonStorage
+from src.features.payments.invoice import Invoice
 
 
 class InvoiceRepository(JsonListRepository[Invoice]):
@@ -15,7 +15,7 @@ class InvoiceRepository(JsonListRepository[Invoice]):
     required_fields = ("order_id", "total")
 
     def __init__(self, storage_or_path: Any = None):
-        default_path = Path(__file__).resolve().parents[2] / "data" / "invoices.json"
+        default_path = Path(__file__).resolve().parents[3] / "data" / "invoices.json"
         storage = (
             JsonStorage(default_path)
             if storage_or_path is None

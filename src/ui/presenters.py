@@ -2,7 +2,7 @@
 from collections.abc import Mapping
 from typing import Any
 
-from src.payments.billing_service import BillingService
+from src.features.payments.billing_service import BillingService
 from src.shared.data_structures.hash_map import HashMap
 from src.shared.money import to_vnd
 

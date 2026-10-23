@@ -2,8 +2,8 @@ import streamlit as st
 
 from src.ui.state import get_current_user
 from src.ui.styles import inject_css
-from src.kitchen.panel import render_kitchen_queue
-from src.payments.panel import render_payment
+from src.features.kitchen.panel import render_kitchen_queue
+from src.features.payments.panel import render_payment
 
 
 def render():

@@ -1,17 +1,17 @@
 """Kiểm thử tích hợp toàn bộ hệ thống F&B từ Storage, Model, Services đến luồng nghiệp vụ."""
-from src.kitchen.queue import OrderQueue
-from src.kitchen.repository import KitchenRepository
-from src.kitchen.service import KitchenService
-from src.menu.repository import MenuRepository
-from src.menu.service import MenuService
-from src.orders.repository import OrderRepository
-from src.orders.service import OrderService
-from src.payments.billing_service import BillingService
-from src.payments.payment import PaymentStatus
-from src.payments.service import PaymentService
-from src.storage.json_storage import StorageManager
-from src.tables.repository import TableRepository
-from src.tables.service import TableService
+from src.features.kitchen.queue import OrderQueue
+from src.features.kitchen.repository import KitchenRepository
+from src.features.kitchen.service import KitchenService
+from src.features.menu.repository import MenuRepository
+from src.features.menu.service import MenuService
+from src.features.orders.repository import OrderRepository
+from src.features.orders.service import OrderService
+from src.features.payments.billing_service import BillingService
+from src.features.payments.payment import PaymentStatus
+from src.features.payments.service import PaymentService
+from src.features.storage.json_storage import StorageManager
+from src.features.tables.repository import TableRepository
+from src.features.tables.service import TableService
 
 
 def test_full_fnb_order_and_payment_flow(tmp_path):

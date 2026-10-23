@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Generic, Iterable, TypeVar
 
-from src.storage.json_storage import JsonStorage
+from src.features.storage.json_storage import JsonStorage
 
 
 Entity = TypeVar("Entity")

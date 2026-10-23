@@ -4,9 +4,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set
 
-from src.kitchen.queue import KitchenRequest
-from src.orders.repository import OrderRepository
-from src.orders.model import Order, OrderItem
+from src.features.kitchen.queue import KitchenRequest
+from src.features.orders.repository import OrderRepository
+from src.features.orders.model import Order, OrderItem
 from src.users.permissions import can_cancel_order, can_edit_order
 
 
@@ -349,7 +349,7 @@ class OrderService:
         if self.queue is None:
             raise ValueError("Chưa kết nối hàng đợi bếp")
 
-        from src.kitchen.queue import KitchenRequest
+        from src.features.kitchen.queue import KitchenRequest
 
         for item in order.items:
             request = KitchenRequest(

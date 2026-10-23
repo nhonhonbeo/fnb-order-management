@@ -5,14 +5,14 @@ from pathlib import Path
 from typing import Any
 
 from src.shared.repository import RepositoryDataError
-from src.storage.json_storage import JsonStorage, StorageManager
+from src.features.storage.json_storage import JsonStorage, StorageManager
 
 
 class TableRepository:
     """Read and update tables while preserving the legacy JSON mapping format."""
 
     def __init__(self, storage_or_path: Any = None):
-        default_path = Path(__file__).resolve().parents[2] / "data" / "tables.json"
+        default_path = Path(__file__).resolve().parents[3] / "data" / "tables.json"
         if storage_or_path is None:
             self.storage = JsonStorage(default_path)
         elif isinstance(storage_or_path, JsonStorage):

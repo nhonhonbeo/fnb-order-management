@@ -78,13 +78,13 @@ class StorageManager:
         self.data_dir = (
             Path(data_dir)
             if data_dir is not None
-            else Path(__file__).resolve().parents[2] / "data"
+            else Path(__file__).resolve().parents[3] / "data"
         )
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         seed_path = self.data_dir / "menu_seed.json"
         if not seed_path.exists():
-            seed_path = Path(__file__).resolve().parents[2] / "data" / "menu_seed.json"
+            seed_path = Path(__file__).resolve().parents[3] / "data" / "menu_seed.json"
         self.menu_seed_storage = JsonStorage(seed_path)
         self.menu_storage = JsonStorage(self.data_dir / "menu.json")
         self.legacy_menu_storage = JsonStorage(self.data_dir / "menu_sample.json")

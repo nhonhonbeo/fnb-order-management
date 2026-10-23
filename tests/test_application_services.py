@@ -3,16 +3,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.kitchen.queue import OrderQueue
-from src.kitchen.service import KitchenService
-from src.menu.service import MenuService
-from src.orders.service import OrderService
-from src.payments.billing_service import BillingService
-from src.payments.service import PaymentError, PaymentService
+from src.features.kitchen.queue import OrderQueue
+from src.features.kitchen.service import KitchenService
+from src.features.menu.service import MenuService
+from src.features.orders.service import OrderService
+from src.features.payments.billing_service import BillingService
+from src.features.payments.service import PaymentError, PaymentService
 from src.reports.service import ReportingService
-from src.storage.json_storage import StorageManager
-from src.tables.repository import TableRepository
-from src.tables.service import TableService
+from src.features.storage.json_storage import StorageManager
+from src.features.tables.repository import TableRepository
+from src.features.tables.service import TableService
 from src.users.permissions import can_manage_menu, can_manage_tables, can_view_revenue
 
 

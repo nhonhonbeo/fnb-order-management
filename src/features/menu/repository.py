@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from src.shared.repository import JsonListRepository, RepositoryDataError
-from src.storage.json_storage import JsonStorage
-from src.menu.model import MenuItem
+from src.features.storage.json_storage import JsonStorage
+from src.features.menu.model import MenuItem
 
 
 class MenuRepository(JsonListRepository[MenuItem]):
@@ -20,7 +20,7 @@ class MenuRepository(JsonListRepository[MenuItem]):
         seed_storage: JsonStorage | None = None,
         legacy_storage: JsonStorage | None = None,
     ):
-        default_data = Path(__file__).resolve().parents[2] / "data"
+        default_data = Path(__file__).resolve().parents[3] / "data"
         if storage_or_path is None:
             storage = JsonStorage(default_data / "menu.json")
             seed_storage = seed_storage or JsonStorage(default_data / "menu_seed.json")

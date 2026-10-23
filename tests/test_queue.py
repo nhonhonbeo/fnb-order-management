@@ -5,10 +5,10 @@ from types import SimpleNamespace
 
 from src.shared.data_structures.queue import Queue
 from src.shared.data_structures.linked_list import LinkedList
-from src.kitchen.queue import EmptyQueueError, KitchenRequest, OrderQueue
-from src.kitchen.service import KitchenService
-from src.menu.service import MenuService
-from src.orders.service import OrderService
+from src.features.kitchen.queue import EmptyQueueError, KitchenRequest, OrderQueue
+from src.features.kitchen.service import KitchenService
+from src.features.menu.service import MenuService
+from src.features.orders.service import OrderService
 
 
 def test_custom_linked_list_queue():

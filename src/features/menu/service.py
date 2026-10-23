@@ -4,8 +4,8 @@ from __future__ import annotations
 from typing import Any, Container, Dict, List, Optional
 
 from src.shared.data_structures.hash_map import HashMap
-from src.menu.repository import MenuRepository
-from src.menu.model import MenuItem
+from src.features.menu.repository import MenuRepository
+from src.features.menu.model import MenuItem
 
 
 class DuplicateCodeError(Exception):

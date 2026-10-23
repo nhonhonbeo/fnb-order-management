@@ -12,15 +12,17 @@ fnb-order-management/
 ├── src/
 │   ├── __init__.py
 │   ├── app.py
-│   ├── menu/          # model, repository, service, page, editor
-│   ├── orders/        # model, repository, service, page
-│   ├── kitchen/       # queue, repository, service, page, panel
-│   ├── tables/        # model, repository, service, dashboard page
-│   ├── payments/      # payment/invoice models, repositories, services, UI
+│   ├── features/
+│   │   ├── menu/      # model, repository, service, page, editor
+│   │   ├── orders/    # model, repository, service, page
+│   │   ├── kitchen/   # queue, repository, service, page, panel
+│   │   ├── tables/    # model, repository, service, dashboard page
+│   │   ├── payments/  # payment/invoice models, repositories, services, UI
+│   │   ├── storage/   # shared JSON storage
+│   │   └── models/    # shared feature models
 │   ├── users/         # model, repository, authentication service and UI
 │   ├── reports/       # cross-domain reporting calculations
 │   ├── shared/        # reusable data structures, money and repository base
-│   ├── storage/       # shared JSON storage
 │   └── ui/            # Streamlit bootstrap and shared UI helpers
 ├── tests/
 ├── .gitignore

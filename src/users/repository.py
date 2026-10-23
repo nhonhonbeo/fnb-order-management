@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from src.shared.repository import JsonListRepository, RepositoryDataError
-from src.storage.json_storage import JsonStorage
+from src.features.storage.json_storage import JsonStorage
 from src.users.model import User
 
 

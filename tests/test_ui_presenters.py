@@ -1,4 +1,4 @@
-from src.orders.model import Order
+from src.features.orders.model import Order
 from src.shared.data_structures.hash_map import HashMap
 from src.ui.presenters import menu_item_view, order_view
 
@@ -25,7 +25,7 @@ def test_order_view_maps_domain_fields_and_statuses():
 
 
 def test_menu_item_view_supports_domain_objects():
-    from src.menu.model import MenuItem
+    from src.features.menu.model import MenuItem
 
     view = menu_item_view(MenuItem("F001", "Phở bò", 45000))
 

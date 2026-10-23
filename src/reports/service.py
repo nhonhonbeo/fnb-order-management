@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
-from src.payments.billing_service import BillingService
+from src.features.payments.billing_service import BillingService
 
 
 class ReportingService:

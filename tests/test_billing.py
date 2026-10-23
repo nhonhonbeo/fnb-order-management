@@ -1,13 +1,13 @@
 import pytest
 
-from src.kitchen.queue import OrderQueue
-from src.menu.service import MenuService
-from src.orders.model import Order
-from src.orders.service import OrderService
-from src.payments.billing_service import BillingService
-from src.payments.invoice import Invoice
-from src.payments.payment import Payment, PaymentStatus
-from src.payments.service import PaymentError, PaymentService
+from src.features.kitchen.queue import OrderQueue
+from src.features.menu.service import MenuService
+from src.features.orders.model import Order
+from src.features.orders.service import OrderService
+from src.features.payments.billing_service import BillingService
+from src.features.payments.invoice import Invoice
+from src.features.payments.payment import Payment, PaymentStatus
+from src.features.payments.service import PaymentError, PaymentService
 
 
 def test_billing_calculation_and_invoicing(tmp_path):

@@ -4,16 +4,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from src.kitchen.queue import KitchenRequest
+from src.features.kitchen.queue import KitchenRequest
 from src.shared.repository import RepositoryDataError
-from src.storage.json_storage import JsonStorage
+from src.features.storage.json_storage import JsonStorage
 
 
 class KitchenRepository:
     """Persist kitchen progress and queue references in the existing JSON shape."""
 
     def __init__(self, storage_or_path: Any = None):
-        default_path = Path(__file__).resolve().parents[2] / "data" / "kitchen.json"
+        default_path = Path(__file__).resolve().parents[3] / "data" / "kitchen.json"
         if storage_or_path is None:
             self.storage = JsonStorage(default_path)
         elif isinstance(storage_or_path, JsonStorage):

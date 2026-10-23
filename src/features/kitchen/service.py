@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.kitchen.queue import KitchenRequest, OrderQueue
-from src.kitchen.repository import KitchenRepository
+from src.features.kitchen.queue import KitchenRequest, OrderQueue
+from src.features.kitchen.repository import KitchenRepository
 
 
 class KitchenOperationRollbackError(RuntimeError):

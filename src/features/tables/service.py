@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from threading import RLock
 from typing import Any, Callable, Dict, Iterable, List
 
-from src.tables.repository import TableRepository
+from src.features.tables.repository import TableRepository
 
 
 _LOCKS_GUARD = RLock()

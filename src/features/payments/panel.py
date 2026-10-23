@@ -1,7 +1,7 @@
 """Giao diện thu ngân và xác nhận thanh toán."""
 import streamlit as st
 
-from src.payments.service import PaymentError
+from src.features.payments.service import PaymentError
 from src.ui.state import currency, refresh_order_table_state
 
 

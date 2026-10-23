@@ -8,11 +8,11 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from src.users import auth_page
-from src.tables import page as dashboard
-from src.menu import page as menu_page
-from src.orders import page as order_page
-from src.kitchen import page as queue_page
-from src.payments import revenue_page
+from src.features.tables import page as dashboard
+from src.features.menu import page as menu_page
+from src.features.orders import page as order_page
+from src.features.kitchen import page as queue_page
+from src.features.payments import revenue_page
 from src.ui.bootstrap import initialise_state
 from src.ui.state import get_current_user, logout_user
 from src.ui.styles import inject_css
