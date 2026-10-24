@@ -20,7 +20,7 @@ class MenuItem:
         price: int = 0,
         is_active: bool = True,
         item_id: Optional[str] = None,
-        processing_time: int = 5,  # Thời gian hoàn thành (phút)
+        processing_time: int = 5,  # Thời gian hoàn thành mặc định (phút)
     ):
         raw_code = item_id if item_id is not None else code
         self.code: str = str(raw_code).strip().upper() if raw_code else ""
@@ -60,7 +60,7 @@ class MenuItem:
         price: Optional[int] = None, 
         processing_time: Optional[int] = None
     ) -> None:
-        """Cập nhật tên, đơn giá và/hoặc thời gian hoàn thành của món ăn."""
+        """Cập nhật tên, đơn giá và/hoặc thời gian hoàn thành của món ăn (Quản lý/Bếp có thể tùy chỉnh)."""
         new_name = self.name if name is None else str(name).strip()
         new_price = self.price if price is None else to_whole_vnd(price)
         new_time = self.processing_time if processing_time is None else int(processing_time)
@@ -84,7 +84,7 @@ class MenuItem:
         self.is_active = True
 
     def to_dict(self) -> Dict[str, Any]:
-        """Chuyển đổi thành từ điển phục vụ lưu trữ JSON."""
+        """Chuyển đổi thành từ điển phục vụ lưu trữ JSON (bao gồm processing_time)."""
         return {
             "item_id": self.code,
             "code": self.code,

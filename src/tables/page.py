@@ -1,6 +1,10 @@
-import streamlit as st
+"""Trang quản lý sơ đồ bàn."""
+from __future__ import annotations
+
 from datetime import datetime
 from html import escape
+
+import streamlit as st
 
 from src.ui.state import currency, refresh_order_table_state
 from src.ui.styles import inject_css
@@ -44,6 +48,7 @@ def _render_table_card(table, can_delete=False, can_change=False):
         st.session_state.current_page = "Tạo đơn hàng"
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
+    
     if can_delete:
         if st.button(
             "Xoá bàn",
@@ -52,6 +57,7 @@ def _render_table_card(table, can_delete=False, can_change=False):
         ):
             st.session_state.pending_table_delete = table["name"]
             st.rerun()
+            
     if can_change and table["status"] in {"Đang phục vụ", "Chờ thanh toán"}:
         if st.button(
             "Đổi bàn",
@@ -141,27 +147,22 @@ def _render_table_management():
         st.warning(f"Bạn có chắc muốn xoá bàn '{pending_table}' không?")
         confirm_column, cancel_column = st.columns(2)
         with confirm_column:
-            confirmed = st.button(
-                "Xác nhận xoá bàn",
-                key="confirm_delete_table",
-                type="primary",
-            )
+            if st.button("Xác nhận xoá bàn", key="confirm_delete_table", type="primary"):
+                try:
+                    st.session_state.table_service.delete_table(pending_table)
+                except ValueError as error:
+                    st.error(str(error))
+                else:
+                    st.session_state.tables = st.session_state.table_service.list_tables()
+                    if st.session_state.get("selected_table") == pending_table:
+                        st.session_state.selected_table = None
+                    st.success(f"Đã xoá bàn '{pending_table}' thành công!")
+                st.session_state.pending_table_delete = None
+                st.rerun()
         with cancel_column:
-            cancelled = st.button("Huỷ", key="cancel_delete_table")
-        if confirmed:
-            try:
-                st.session_state.table_service.delete_table(pending_table)
-            except ValueError as error:
-                st.error(str(error))
-            else:
-                st.session_state.tables = st.session_state.table_service.list_tables()
-                if st.session_state.get("selected_table") == pending_table:
-                    st.session_state.selected_table = None
-                st.success(f"Đã xoá bàn '{pending_table}'")
-            st.session_state.pending_table_delete = None
-        elif cancelled:
-            st.session_state.pending_table_delete = None
-            st.rerun()
+            if st.button("Huỷ", key="cancel_delete_table"):
+                st.session_state.pending_table_delete = None
+                st.rerun()
 
 
 ORDER_STATUS = {
@@ -179,61 +180,10 @@ def _order_time(order):
     return datetime.fromisoformat(order["created_at"]).strftime("%H:%M")
 
 
-def _render_recent_order(order):
-    status, style = ORDER_STATUS.get(order["status"], (order["status"], "new"))
-    items_count = st.session_state.reporting_service.order_item_count(order)
-    details = [
-        ("Mã đơn", order["id"]),
-        ("Bàn", order["table"]),
-        ("Số món", items_count),
-        (
-            "Tổng tiền",
-            currency(st.session_state.billing_service.calculate_total(order)),
-        ),
-        ("Thời gian", _order_time(order)),
-    ]
-    fields = "".join(
-        f'<div><div class="order-card__label">{label}</div><div class="order-card__value">{escape(str(value))}</div></div>'
-        for label, value in details
-    )
-    st.markdown(
-        f'{"<div class=\"order-card\">"}{fields}<span class="status-badge status-badge--{style}">{status}</span></div>',
-        unsafe_allow_html=True,
-    )
-
-
-def _render_best_sellers(orders):
-    best_sellers = st.session_state.reporting_service.best_sellers(orders)
-    if not best_sellers:
-        st.caption("Chưa có dữ liệu món bán.")
-        return
-    maximum = max(quantity for _, quantity in best_sellers)
-    for rank, (name, quantity) in enumerate(best_sellers, start=1):
-        width = max(8, round(quantity / maximum * 100))
-        st.markdown(
-            f'''<div class="best-seller">
-                <div class="best-seller__line"><span>{rank}. {escape(name)}</span><span>{quantity} món</span></div>
-                <div class="best-seller__bar"><div class="best-seller__fill" style="width:{width}%"></div></div>
-            </div>''',
-            unsafe_allow_html=True,
-        )
-
-
-def _render_hourly_revenue(orders):
-    revenue_by_hour = st.session_state.reporting_service.hourly_revenue(orders)
-    st.bar_chart(
-        {"Giờ": list(revenue_by_hour), "Doanh thu": list(revenue_by_hour.values())},
-        x="Giờ",
-        y="Doanh thu",
-        color="#E8590C",
-        height=210,
-    )
-
-
 def _format_dashboard_datetime(now):
     weekdays = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
     shift = "Ca sáng" if 6 <= now.hour < 14 else "Ca chiều" if now.hour < 18 else "Ca tối"
-    return f"{weekdays[now.weekday()]}, {now:%d/%m/%Y} • {shift}"
+    return f"{weekdays[now.weekday()]}, {now:%d/%m/%Y} — {shift}"
 
 
 def _dashboard_alerts(orders):

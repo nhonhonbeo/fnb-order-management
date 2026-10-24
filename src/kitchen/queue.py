@@ -17,7 +17,7 @@ class KitchenRequest:
     item_code: str
     item_name: str
     quantity: int
-    processing_time: int = 5  # Thêm thời gian hoàn thành (phút) phục vụ thuật toán SPTF
+    processing_time: int = 5  # Thời gian hoàn thành (phút) phục vụ thuật toán SPTF
     created_at: str = ""      # Thời gian tạo hóa đơn (dùng cho quy tắc FIFO hóa đơn)
     status: str = "NEW"
 
@@ -73,15 +73,30 @@ class OrderQueue:
         2. SPTF đối với món trong cùng hóa đơn (processing_time từ ngắn đến dài).
         """
         items_list = list(self._items)
-        # Sắp xếp kết hợp: order_id/created_at trước (FIFO), sau đó đến processing_time (SPTF)
-        sorted_items = sorted(
-            items_list,
-            key=lambda req: (req.created_at if req.created_at else "", req.processing_time)
-        )
+        
+        # Bước 1: Lấy danh sách các hóa đơn theo thời gian tạo (giữ chuẩn FIFO hóa đơn)
+        order_creation_map = {}
+        for req in items_list:
+            if req.order_id not in order_creation_map:
+                order_creation_map[req.order_id] = req.created_at or ""
+                
+        sorted_orders = sorted(order_creation_map.keys(), key=lambda oid: order_creation_map[oid])
+        
+        # Bước 2: Với từng hóa đơn, sắp xếp các món bên trong theo thời gian chế biến (SPTF)
+        grouped_requests = {oid: [] for oid in sorted_orders}
+        for req in items_list:
+            if req.order_id in grouped_requests:
+                grouped_requests[req.order_id].append(req)
+                
+        sorted_items = []
+        for oid in sorted_orders:
+            order_items = sorted(grouped_requests[oid], key=lambda r: r.processing_time)
+            sorted_items.extend(order_items)
+            
         return sorted_items
 
     def _sort_queue(self) -> None:
-        """Hỗn hợp sắp xếp lại cấu trúc Queue bên trong."""
+        """Sắp xếp lại cấu trúc Queue bên trong."""
         sorted_list = self.list_requests()
         self._items = Queue()
         for req in sorted_list:
