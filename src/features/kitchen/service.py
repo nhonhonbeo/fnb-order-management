@@ -1,4 +1,4 @@
-"""Nghiệp vụ điều phối hàng đợi bếp theo nguyên tắc FIFO."""
+"""Nghiệp vụ điều phối hàng đợi bếp theo nguyên tắc FIFO cho hóa đơn và SPTF cho món."""
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
@@ -93,6 +93,14 @@ class KitchenService:
         """Đưa món ăn vào hàng đợi chờ bếp nấu."""
         if not hasattr(self.kitchen_queue, "enqueue"):
             raise ValueError("Hàng đợi bếp không hỗ trợ thêm yêu cầu")
+        
+        # Đảm bảo gán created_at và processing_time nếu đối tượng truyền vào chưa có
+        if self.order_service is not None and hasattr(request_or_item, "order_id"):
+            order = self.order_service.get_order(request_or_item.order_id)
+            if order is not None:
+                if hasattr(order, "created_at") and not getattr(request_or_item, "created_at", ""):
+                    request_or_item.created_at = order.created_at
+
         request_key = self._request_key(request_or_item)
         if request_key in self._requests:
             raise ValueError(
@@ -105,7 +113,7 @@ class KitchenService:
             self.save()
 
     def current(self) -> Optional[KitchenRequest]:
-        """Trả về món ở đầu hàng đợi, hoặc None nếu hàng đợi trống."""
+        """Trả về món ở đầu hàng đợi (tuân thủ FIFO hóa đơn và SPTF món), hoặc None nếu trống."""
         if self.is_empty():
             return None
         return self.kitchen_queue.peek()
@@ -197,7 +205,7 @@ class KitchenService:
             self.kitchen_queue.enqueue(request)
 
     def next_item(self) -> Any:
-        """Lấy món tiếp theo theo thứ tự FIFO."""
+        """Lấy món tiếp theo theo thứ tự ưu tiên."""
         if hasattr(self.kitchen_queue, "dequeue"):
             return self.kitchen_queue.dequeue()
         return None
@@ -209,7 +217,7 @@ class KitchenService:
         return None
 
     def list_requests(self) -> List[Any]:
-        """Trả về toàn bộ danh sách món đang chờ trong hàng đợi."""
+        """Trả về toàn bộ danh sách món đang chờ trong hàng đợi theo chuẩn FIFO + SPTF."""
         if hasattr(self.kitchen_queue, "list_requests"):
             return self.kitchen_queue.list_requests()
         return []
@@ -228,7 +236,6 @@ class KitchenService:
             self.save()
 
     def mark_order_done(self, order_id: str) -> None:
-        """Mark all saved kitchen requests for a paid order as done."""
         changed = False
         for request in self._requests.values():
             if request.order_id == order_id and request.status != "DONE":
@@ -281,6 +288,13 @@ class KitchenService:
         if any(request.order_id != order_id for request in desired_requests):
             raise ValueError("Yêu cầu bếp không khớp với đơn hàng")
 
+        # Lấy thông tin thời gian tạo của đơn hàng để truyền vào request mới (phục vụ FIFO hóa đơn)
+        order_created_at = ""
+        if self.order_service is not None:
+            order = self.order_service.get_order(order_id)
+            if order is not None and hasattr(order, "created_at"):
+                order_created_at = order.created_at
+
         existing = {
             request.item_code: request
             for request in self._requests.values()
@@ -304,12 +318,18 @@ class KitchenService:
         replacements: dict[str, KitchenRequest] = {}
         for item_code, requested in desired.items():
             previous = existing.get(item_code)
+            
+            # Kế thừa hoặc bổ sung processing_time và created_at
+            proc_time = getattr(requested, "processing_time", 5)
+            
             if previous is None:
                 replacement = KitchenRequest(
                     order_id=order_id,
                     item_code=item_code,
                     item_name=requested.item_name,
                     quantity=requested.quantity,
+                    processing_time=proc_time,
+                    created_at=order_created_at,
                 )
             elif previous.status == "NEW":
                 replacement = KitchenRequest(
@@ -317,6 +337,8 @@ class KitchenService:
                     item_code=item_code,
                     item_name=requested.item_name,
                     quantity=requested.quantity,
+                    processing_time=proc_time,
+                    created_at=order_created_at,
                 )
             else:
                 replacement = KitchenRequest(
@@ -324,6 +346,8 @@ class KitchenService:
                     item_code=item_code,
                     item_name=previous.item_name,
                     quantity=previous.quantity,
+                    processing_time=getattr(previous, "processing_time", proc_time),
+                    created_at=getattr(previous, "created_at", order_created_at),
                     status=previous.status,
                 )
             replacements[item_code] = replacement

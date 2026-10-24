@@ -238,6 +238,58 @@ class OrderService:
         self.save()
         return order
 
+    def remove_item(self, order_id: str, item_code: str) -> Order:
+        """
+        Hủy/xóa đúng MỘT món cụ thể khỏi đơn hàng khi đơn chưa gửi bếp (trạng thái NEW).
+        """
+        order = self.get_order(order_id)
+        if order.status != "NEW":
+            raise ValueError("Không thể hủy món vì bếp đã xác nhận nấu hoặc đơn đang được xử lý.")
+
+        normalized_code = item_code.strip().upper()
+        initial_len = len(order.items)
+        
+        order.items = [item for item in order.items if item.item_code != normalized_code]
+        
+        if len(order.items) == initial_len:
+            raise ValueError(f"Không tìm thấy món có mã '{normalized_code}' trong đơn hàng.")
+
+        self.save()
+        
+        if self.queue is not None:
+            current_requests = self.queue.list_requests()
+            updated_requests = [
+                req for req in current_requests 
+                if not (req.order_id == order_id and req.item_code == normalized_code)
+            ]
+            self.queue.replace_all(updated_requests)
+
+        return order
+
+    def update_item_quantity(self, order_id: str, item_code: str, new_quantity: int) -> Order:
+        """
+        Đổi số lượng của đúng MỘT món cụ thể khi đơn hàng ở trạng thái NEW.
+        """
+        order = self.get_order(order_id)
+        if order.status != "NEW":
+            raise ValueError("Không thể đổi số lượng món vì bếp đã xác nhận nấu hoặc đơn đang được xử lý.")
+
+        self._validate_quantity(new_quantity)
+        normalized_code = item_code.strip().upper()
+        
+        found = False
+        for item in order.items:
+            if item.item_code == normalized_code:
+                item.quantity = new_quantity
+                found = True
+                break
+                
+        if not found:
+            raise ValueError(f"Không tìm thấy món có mã '{normalized_code}' trong đơn hàng.")
+
+        self.save()
+        return order
+
     def add_to_cart(self, cart: List[Dict[str, Any]], code: str, quantity: int) -> None:
         """Validate a menu selection and add or increment it in the unsaved cart."""
         self._validate_quantity(quantity)
@@ -283,15 +335,16 @@ class OrderService:
             raise ValueError("Số lượng phải là số nguyên lớn hơn 0")
 
     def create_order_from_cart(self, table_id: str, cart: List[Dict[str, Any]]) -> Order:
-        """Validate and place a complete cart as an order, sending it to the kitchen."""
+        """Validate and place a complete cart as an order (or append to active table order), sending new items to the kitchen."""
         if not cart:
-            raise ValueError("Đơn phải có món và đang ở trạng thái NEW")
+            raise ValueError("Đơn phải có món")
         if self.menu is None:
             raise ValueError("Chưa kết nối thực đơn")
         if self.queue is None:
             raise ValueError("Chưa kết nối hàng đợi bếp")
-        if self.table_service is not None and not self.table_service.is_available(table_id):
-            raise ValueError("Bàn không tồn tại hoặc đang được phục vụ")
+
+        # Kiểm tra xem bàn đã có đơn hàng nào đang hoạt động chưa (gọi thêm món)
+        active_order = self.get_active_order_by_table(table_id)
 
         resolved_items: Dict[str, tuple[Any, int]] = {}
         for line in cart:
@@ -310,6 +363,36 @@ class OrderService:
             else:
                 resolved_items[item.code] = (item, line["quantity"])
 
+        # TRƯỜNG HỢP 1: Bàn đang có đơn hoạt động -> TỰ ĐỘNG GỌI THÊM MÓN VÀO ĐƠN HIỆN TẠI
+        if active_order is not None:
+            for item, quantity in resolved_items.values():
+                existing_order_item = next(
+                    (i for i in active_order.items if i.item_code == item.code), 
+                    None
+                )
+                if existing_order_item is not None:
+                    existing_order_item.quantity += quantity
+                else:
+                    active_order.add_line(item.code, item.name, quantity, item.price)
+                
+                menu_item = self.menu.get_item(item.code)
+                proc_time = menu_item.processing_time if menu_item else 5
+                self.queue.enqueue(KitchenRequest(
+                    order_id=active_order.order_id,
+                    item_code=item.code,
+                    item_name=item.name,
+                    quantity=quantity,
+                    processing_time=proc_time,
+                    created_at=active_order.created_at,
+                ))
+
+            self.save()
+            return active_order
+
+        # TRƯỜNG HỢP 2: Bàn trống -> TẠO ĐƠN MỚI HOÀN TOÀN
+        if self.table_service is not None and not self.table_service.is_available(table_id):
+            raise ValueError("Bàn không tồn tại hoặc đang được phục vụ")
+
         if self.table_service is not None:
             self.table_service.reserve(table_id)
 
@@ -322,11 +405,15 @@ class OrderService:
             self.save()
 
             for item, quantity in resolved_items.values():
+                menu_item = self.menu.get_item(item.code)
+                proc_time = menu_item.processing_time if menu_item else 5
                 self.queue.enqueue(KitchenRequest(
                     order_id=order.order_id,
                     item_code=item.code,
                     item_name=item.name,
                     quantity=quantity,
+                    processing_time=proc_time,
+                    created_at=order.created_at,
                 ))
             order.status = "IN_PROGRESS"
             self.save()
@@ -352,11 +439,15 @@ class OrderService:
         from src.features.kitchen.queue import KitchenRequest
 
         for item in order.items:
+            menu_item = self.menu.get_item(item.item_code) if self.menu else None
+            proc_time = menu_item.processing_time if menu_item else 5
             request = KitchenRequest(
                 order_id=order.order_id,
                 item_code=item.item_code,
                 item_name=item.item_name,
                 quantity=item.quantity,
+                processing_time=proc_time,
+                created_at=order.created_at,
             )
             self.queue.enqueue(request)
 
@@ -367,8 +458,9 @@ class OrderService:
     def mark_completed(self, order_id: str) -> Order:
         order = self.get_order(order_id)
 
-        if order.status != "IN_PROGRESS":
-            raise ValueError("Đơn chưa được gửi bếp")
+        if order.status in {"PAID", "CANCELLED"}:
+            raise ValueError("Đơn đã thanh toán hoặc đã hủy, không thể hoàn thành")
+
         previous_status = order.status
         order.status = "COMPLETED"
         try:
@@ -457,15 +549,20 @@ class OrderService:
                 raise ValueError("Chưa kết nối dịch vụ bếp để sửa đơn đã gửi")
             kitchen_snapshot = self.kitchen_service.snapshot_order_state()
             new_item_codes = set(seen_codes) - set(existing)
-            desired_requests = [
-                KitchenRequest(
-                    order_id=order.order_id,
-                    item_code=item.item_code,
-                    item_name=item.item_name,
-                    quantity=item.quantity,
+            desired_requests = []
+            for item in updated_items:
+                menu_item = self.menu.get_item(item.item_code) if self.menu else None
+                proc_time = menu_item.processing_time if menu_item else 5
+                desired_requests.append(
+                    KitchenRequest(
+                        order_id=order.order_id,
+                        item_code=item.item_code,
+                        item_name=item.item_name,
+                        quantity=item.quantity,
+                        processing_time=proc_time,
+                        created_at=order.created_at,
+                    )
                 )
-                for item in updated_items
-            ]
 
         old_items = order.items
         old_note = order.note

@@ -20,20 +20,24 @@ class MenuItem:
         price: int = 0,
         is_active: bool = True,
         item_id: Optional[str] = None,
+        processing_time: int = 5,  # Thời gian hoàn thành mặc định (phút)
     ):
         raw_code = item_id if item_id is not None else code
         self.code: str = str(raw_code).strip().upper() if raw_code else ""
         self.name: str = str(name).strip() if name else ""
         self.price: int = to_whole_vnd(price)
         self.is_active: bool = bool(is_active)
+        self.processing_time: int = int(processing_time)
 
         self._validate()
 
     def _validate(self) -> None:
-        """Kiểm tra tính hợp lệ của mã món, tên món và giá bán."""
+        """Kiểm tra tính hợp lệ của mã món, tên món, giá bán và thời gian chế biến."""
         if not self.code or not self.name:
             raise ValueError("Mã và tên không được rỗng")
         self._validate_price(self.price)
+        if self.processing_time < 0:
+            raise ValueError("Thời gian hoàn thành không được âm")
 
     @staticmethod
     def _validate_price(price: Any) -> None:
@@ -50,17 +54,26 @@ class MenuItem:
     def item_id(self, value: str) -> None:
         self.code = str(value).strip().upper()
 
-    def update(self, name: Optional[str] = None, price: Optional[int] = None) -> None:
-        """Cập nhật tên và/hoặc đơn giá của món ăn."""
+    def update(
+        self, 
+        name: Optional[str] = None, 
+        price: Optional[int] = None, 
+        processing_time: Optional[int] = None
+    ) -> None:
+        """Cập nhật tên, đơn giá và/hoặc thời gian hoàn thành của món ăn (Quản lý/Bếp có thể tùy chỉnh)."""
         new_name = self.name if name is None else str(name).strip()
         new_price = self.price if price is None else to_whole_vnd(price)
+        new_time = self.processing_time if processing_time is None else int(processing_time)
 
         if not new_name:
             raise ValueError("Mã và tên không được rỗng")
         self._validate_price(new_price)
+        if new_time < 0:
+            raise ValueError("Thời gian hoàn thành không được âm")
 
         self.name = new_name
         self.price = new_price
+        self.processing_time = new_time
 
     def deactivate(self) -> None:
         """Tạm ngừng kinh doanh món ăn."""
@@ -71,13 +84,14 @@ class MenuItem:
         self.is_active = True
 
     def to_dict(self) -> Dict[str, Any]:
-        """Chuyển đổi thành từ điển phục vụ lưu trữ JSON."""
+        """Chuyển đổi thành từ điển phục vụ lưu trữ JSON (bao gồm processing_time)."""
         return {
             "item_id": self.code,
             "code": self.code,
             "name": self.name,
             "price": self.price,
             "is_active": self.is_active,
+            "processing_time": self.processing_time,
         }
 
     @classmethod
@@ -89,6 +103,7 @@ class MenuItem:
             name=data.get("name", ""),
             price=data.get("price", 0),
             is_active=bool(data.get("is_active", True)),
+            processing_time=int(data.get("processing_time", 5)),
         )
 
     def __getitem__(self, key: str) -> Any:
@@ -98,6 +113,7 @@ class MenuItem:
             "name": self.name,
             "price": self.price,
             "is_active": self.is_active,
+            "processing_time": self.processing_time,
         }
         if key in mapping:
             return mapping[key]
@@ -112,6 +128,8 @@ class MenuItem:
             self.price = to_whole_vnd(value)
         elif key == "is_active":
             self.is_active = bool(value)
+        elif key == "processing_time":
+            self.processing_time = int(value)
         else:
             setattr(self, key, value)
 
@@ -122,7 +140,10 @@ class MenuItem:
             return default
 
     def __contains__(self, key: str) -> bool:
-        return key in ("item_id", "code", "name", "price", "is_active")
+        return key in ("item_id", "code", "name", "price", "is_active", "processing_time")
 
     def __repr__(self) -> str:
-        return f"MenuItem(code='{self.code}', name='{self.name}', price={self.price}, is_active={self.is_active})"
+        return (
+            f"MenuItem(code='{self.code}', name='{self.name}', "
+            f"price={self.price}, is_active={self.is_active}, processing_time={self.processing_time})"
+        )
