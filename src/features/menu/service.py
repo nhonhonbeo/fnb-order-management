@@ -1,169 +1,149 @@
-"""Nghiệp vụ quản lý thực đơn (Menu Service / Menu Manager)."""
+"""Dịch vụ quản lý thực đơn (Menu Service) trong hệ thống F&B."""
 from __future__ import annotations
 
-from typing import Any, Container, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from src.shared.data_structures.hash_map import HashMap
 from src.features.menu.repository import MenuRepository
 from src.features.menu.model import MenuItem
 
 
-class DuplicateCodeError(Exception):
-    """Ngoại lệ khi mã món ăn bị trùng lặp."""
-    pass
-
-
-class ItemNotFoundError(Exception):
-    """Ngoại lệ khi không tìm thấy món ăn trong thực đơn."""
-    pass
+class DuplicateCodeError(ValueError):
+    """Raised when a menu item code already exists."""
 
 
 class MenuService:
-    """Quản lý danh mục món ăn, tìm kiếm, cập nhật và lưu trữ thực đơn."""
+    """Quản lý danh sách món ăn, trạng thái kinh doanh và thời gian chế biến."""
 
     def __init__(self, storage_or_path: Optional[Any] = None):
-        self.repository = (
-            storage_or_path
-            if isinstance(storage_or_path, MenuRepository)
-            else MenuRepository(storage_or_path)
-        )
-        self._map = HashMap(initial_capacity=16)
+        if isinstance(storage_or_path, MenuRepository):
+            self.repository = storage_or_path
+        else:
+            self.repository = MenuRepository(storage_or_path)
+            
         self._items: Dict[str, MenuItem] = {}
-        self._order_service: Any = None
+        self.order_service: Optional[Any] = None
         self.load()
 
     def set_order_service(self, order_service: Any) -> None:
-        self._order_service = order_service
-
-    @staticmethod
-    def _normalize_code(code: str) -> str:
-        if not isinstance(code, str):
-            raise ValueError("Mã món phải là chuỗi ký tự")
-        return code.strip().upper()
+        """Liên kết dịch vụ đơn hàng với menu service."""
+        self.order_service = order_service
 
     def load(self) -> None:
-        """Load menu entities from their repository."""
-        self._items.clear()
-        self._map = HashMap(initial_capacity=16)
-        for item in self.repository.list_all():
-            self._items[item.code] = item
-            self._map.put(item.code, item)
+        """Nạp danh sách món ăn từ cơ sở dữ liệu / file JSON."""
+        raw_items = []
+        if hasattr(self.repository, "load_items"):
+            raw_items = self.repository.load_items()
+        elif hasattr(self.repository, "load"):
+            raw_items = self.repository.load()
+        elif hasattr(self.repository, "get_all"):
+            raw_items = self.repository.get_all()
+
+        self._items = {}
+        for item in raw_items:
+            if isinstance(item, dict):
+                menu_item = MenuItem.from_dict(item)
+            elif isinstance(item, MenuItem):
+                menu_item = item
+            else:
+                continue
+            self._items[menu_item.code] = menu_item
 
     def save(self) -> None:
-        """Persist the current menu through its repository."""
-        self.repository.save_all(self.list_items(only_active=False))
+        """Lưu trạng thái thực đơn vào cơ sở dữ liệu / file JSON."""
+        items_list = list(self._items.values())
+        if hasattr(self.repository, "save_items"):
+            self.repository.save_items(items_list)
+        elif hasattr(self.repository, "save"):
+            self.repository.save(items_list)
+
+    def get_item(self, item_code: str) -> Optional[MenuItem]:
+        """Lấy thông tin chi tiết một món ăn theo mã (code hoặc item_id)."""
+        normalized_code = str(item_code).strip().upper()
+        return self._items.get(normalized_code)
+
+    def list_items(self, only_active: bool = False, active_only: Optional[bool] = None) -> List[MenuItem]:
+        """Lấy danh sách toàn bộ món ăn trong thực đơn."""
+        filter_active = active_only if active_only is not None else only_active
+        items = list(self._items.values())
+        if filter_active:
+            return [item for item in items if item.is_active]
+        return items
 
     def add_item(
         self,
-        code_or_item: Any,
-        name: Optional[str] = None,
-        price: Optional[int] = None,
+        code: str,
+        name: str,
+        price: int,
+        processing_time: int = 5,
+        is_active: bool = True,
     ) -> MenuItem:
-        """Thêm món ăn mới vào thực đơn. Chấp nhận đối tượng MenuItem hoặc (code, name, price)."""
-        if isinstance(code_or_item, MenuItem):
-            item = code_or_item
-        else:
-            if name is None or price is None:
-                raise ValueError("Vui lòng cung cấp đầy đủ mã, tên và giá món")
-            item = MenuItem(code=str(code_or_item), name=name, price=price)
+        """Thêm một món ăn mới vào thực đơn với thời gian chế biến tùy chỉnh."""
+        normalized_code = str(code).strip().upper()
+        if normalized_code in self._items:
+            raise DuplicateCodeError(f"Món ăn có mã '{normalized_code}' đã tồn tại trong thực đơn")
 
-        if item.code in self._items:
-            raise DuplicateCodeError(f"Mã món '{item.code}' đã tồn tại trong thực đơn.")
-
-        self.repository.add(item)
-        self._items[item.code] = item
-        self._map.put(item.code, item)
-        return item
-
-    def get_item(self, code: str) -> Optional[MenuItem]:
-        """Tra cứu món theo mã (O(1))."""
-        normalized = self._normalize_code(code)
-        return self._map.get(normalized)
-
-    def find_item(self, item_id: str) -> Optional[MenuItem]:
-        """Bí danh tra cứu theo item_id."""
-        return self.get_item(item_id)
+        new_item = MenuItem(
+            code=normalized_code,
+            name=name,
+            price=price,
+            processing_time=processing_time,
+            is_active=is_active,
+        )
+        self._items[normalized_code] = new_item
+        self.save()
+        return new_item
 
     def update_item(
         self,
-        code: str,
+        item_code: str,
         name: Optional[str] = None,
         price: Optional[int] = None,
-        is_active: Optional[bool] = None,
+        processing_time: Optional[int] = None,
     ) -> MenuItem:
-        """Cập nhật thông tin (tên/giá) của món ăn."""
-        if is_active is not None and not isinstance(is_active, bool):
-            raise ValueError("Trạng thái món phải là boolean")
-        item = self.get_item(code)
+        """Cập nhật thông tin món ăn (tên, giá, thời gian chế biến)."""
+        item = self.get_item(item_code)
         if item is None:
-            raise ItemNotFoundError(f"Không tìm thấy món ăn với mã '{code}'.")
+            raise ValueError(f"Không tìm thấy món ăn có mã '{item_code}'")
 
-        updated_item = MenuItem(
-            code=item.code,
-            name=item.name if name is None else name,
-            price=item.price if price is None else price,
-            is_active=item.is_active,
-        )
-        if is_active is not None:
-            updated_item.is_active = is_active
-        self.repository.update(updated_item)
-        item.name = updated_item.name
-        item.price = updated_item.price
-        item.is_active = updated_item.is_active
-        self._map.put(item.code, item)
+        item.update(name=name, price=price, processing_time=processing_time)
+        self.save()
         return item
 
-    def toggle_status(self, code: str) -> MenuItem:
-        """Đảo trạng thái kinh doanh của món và lưu thay đổi."""
-        item = self.get_item(code)
+    def update_processing_time(self, item_code: str, new_processing_time: int) -> MenuItem:
+        """
+        Cho phép quản lý hoặc nhà bếp điều chỉnh thời gian hoàn thành (processing_time) 
+        của món ăn linh hoạt theo thực tế vận hành.
+        """
+        item = self.get_item(item_code)
         if item is None:
-            raise ItemNotFoundError(f"Không tìm thấy món ăn với mã '{code}'.")
-        return self.update_item(code, is_active=not item.is_active)
+            raise ValueError(f"Không tìm thấy món ăn có mã '{item_code}'")
 
-    def remove_item(
-        self,
-        code: str,
-        used_codes: Optional[Container[str]] = None,
-    ) -> bool:
-        """Xóa món khỏi thực đơn; nếu đã phát sinh trong đơn hàng thì chuyển sang tạm ngừng (deactivate)."""
-        item = self.get_item(code)
+        if new_processing_time < 0:
+            raise ValueError("Thời gian hoàn thành không được âm")
+
+        item.processing_time = int(new_processing_time)
+        self.save()
+        return item
+
+    def set_active_status(self, item_code: str, is_active: bool) -> MenuItem:
+        """Kinh doanh hoặc tạm ngừng kinh doanh món ăn."""
+        item = self.get_item(item_code)
         if item is None:
-            return False
+            raise ValueError(f"Không tìm thấy món ăn có mã '{item_code}'")
 
-        if used_codes is None:
-            used_codes = (
-                self._order_service.used_codes()
-                if self._order_service is not None
-                else ()
-            )
-        normalized_used = {self._normalize_code(c) for c in used_codes}
-        if item.code in normalized_used:
-            item.deactivate()
-            self.repository.update(item)
+        if is_active:
+            item.activate()
         else:
-            self.repository.delete(item.code)
-            self._items.pop(item.code, None)
-            self._map.remove(item.code)
+            item.deactivate()
+        self.save()
+        return item
 
-        return True
+    def delete_item(self, item_code: str) -> None:
+        """Xóa vĩnh viễn một món ăn khỏi thực đơn."""
+        normalized_code = str(item_code).strip().upper()
+        if normalized_code not in self._items:
+            raise ValueError(f"Không tìm thấy món ăn có mã '{item_code}'")
 
-    def list_items(self, only_active: bool = False) -> List[MenuItem]:
-        """Trả về danh sách tất cả các món ăn, sắp xếp theo mã."""
-        items = list(self._items.values())
-        if only_active:
-            items = [item for item in items if item.is_active]
-        return sorted(items, key=lambda x: x.code)
-
-    def search(self, keyword: str) -> List[MenuItem]:
-        """Tìm kiếm món ăn theo mã hoặc tên món."""
-        return sorted(self.repository.search_items(keyword), key=lambda item: item.code)
-
-    def __iter__(self):
-        return iter(self.list_items())
-
-    def __len__(self):
-        return len(self._items)
-
-
-# Định nghĩa alias MenuManager tương thích hoàn toàn với bài tập của nhóm
-MenuManager = MenuService
+        del self._items[normalized_code]
+        self.save()

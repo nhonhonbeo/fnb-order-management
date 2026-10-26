@@ -1,86 +1,85 @@
-[
-  {
-    "username": "admin",
-    "password_hash": "d58f3673db57cd17048279869ef5cae4$100000$730e80d91220bf06636234d87958a705057c29b0b64fcfb7b7c265a7a7ec469e",
-    "full_name": "Quản Trị Viên",
-    "role": "Quản lý",
-    "created_at": "2026-10-17T08:14:07.521628"
-  },
-  {
-    "username": "nhanvien",
-    "password_hash": "a891aea08076096f3fc0ca0ba53a8d2c$100000$2244a621e185c4642b06166409b1b955560707f187547999edfc4a6fa5198b36",
-    "full_name": "Nguyễn Văn Thu Ngân",
-    "role": "Nhân viên",
-    "created_at": "2026-10-17T08:14:07.601205"
-  },
-  {
-    "username": "minhtran",
-    "password_hash": "922d37cccc9881544a156f1041bfbc22$100000$76c4e3de37b50c2871e1eece88974d8b451b1f25b8157ebf16220ae190a9065c",
-    "full_name": "Tran Van Minh",
-    "role": "Thu ngân",
-    "created_at": "2026-10-17T08:21:24.897064"
-  },
-  {
-    "username": "Bduy",
-    "password_hash": "6277d918e4a250ad531c8c37ed6a7a75$100000$8611a23591f9ef3caa4a07570adb52d6ff546bea96325e8b1bcea484ea6da7fa",
-    "full_name": "Bảo Duy",
-    "role": "Đầu bếp",
-    "created_at": "2026-10-17T08:26:34.711947"
-  },
-  {
-    "username": "beptruong",
-    "password_hash": "1bf4ecd856cf1d80fef12b935062c7be$100000$e033880ff95f0d8108fb40f8af48ac1f39d2b6f46ed872761a41cd7140589a59",
-    "full_name": "Bep Truong Hai",
-    "role": "Đầu bếp",
-    "created_at": "2026-10-17T08:33:58.950917"
-  },
-  {
-    "username": "ngthai",
-    "password_hash": "624ba03acf005ec4ff56cb9f151c7907$100000$33186b870ca7afd57f5dd0cc5f38cde08589e4889cbf70ae6a0b44bdbf48e81f",
-    "full_name": "Nguyễn Thái",
-    "role": "Đầu bếp",
-    "created_at": "2026-10-17T08:37:56.789520"
-  },
-  {
-    "username": "fanta",
-    "password_hash": "1e7379706d8243ab5ff8b5f6f464ad52$100000$706e375dc1a5b569ffa541b50fa1dd445b46e4bc8de7f40f80e5f53c4875da14",
-    "full_name": "Fan Tá",
-    "role": "Nhân viên",
-    "created_at": "2026-10-17T08:38:30.002500"
-  },
-  {
-    "username": "baobao",
-    "password_hash": "5eddc23fde6b3ce3670a6e94391d295a$100000$7dc333d24d2801ddc4f3fcc67ca9e7fad1b34be9aa405f1997efa9aa55487433",
-    "full_name": "bảo bảo",
-    "role": "Thu ngân",
-    "created_at": "2026-10-17T08:39:24.390304"
-  },
-  {
-    "username": "tvn",
-    "password_hash": "a073afcf43859ac72203ea0f6b8ae6fb$100000$fb9b405c800cc86bf4d5370158cefd6d3ceb48cc1666a8e719d0ecb8080992bc",
-    "full_name": "tran van nam",
-    "role": "Quản lý",
-    "created_at": "2026-10-17T08:40:05.575047"
-  },
-  {
-    "username": "nhanvienvien",
-    "password_hash": "306ea3e42ff9b8fd255559b13b052579$100000$23608bbba83ae3245fb815186318c886c3c5b2c2593bcf0c8333dce227c7f3a7",
-    "full_name": "thang nhan vien",
-    "role": "Nhân viên",
-    "created_at": "2026-10-17T08:41:12.478461"
-  },
-  {
-    "username": "nhanvien1",
-    "password_hash": "25115d7e2a1f117d7ef7e370c40a6952$100000$abd0f91e8957bad50897338b0f271dd3cc2458a4f8e8e795fd830dd9d6861a77",
-    "full_name": "nguyễn nhân viên",
-    "role": "Nhân viên",
-    "created_at": "2026-10-21T23:33:47.580423"
-  },
-  {
-    "username": "daubep1",
-    "password_hash": "a54970170e5e444d2ae94922d43f2f77$100000$23a9de8986ee08342e703a584090cb7bebc1b77495483f79375a10c55c38cec4",
-    "full_name": "phan đầu bếp",
-    "role": "Đầu bếp",
-    "created_at": "2026-10-21T23:35:27.646400"
-  }
+[{
+        "username": "admin",
+        "password_hash": "d58f3673db57cd17048279869ef5cae4$100000$730e80d91220bf06636234d87958a705057c29b0b64fcfb7b7c265a7a7ec469e",
+        "full_name": "Quản Trị Viên",
+        "role": "Quản lý",
+        "created_at": "2026-10-17T08:14:07.521628"
+    },
+    {
+        "username": "nhanvien",
+        "password_hash": "a891aea08076096f3fc0ca0ba53a8d2c$100000$2244a621e185c4642b06166409b1b955560707f187547999edfc4a6fa5198b36",
+        "full_name": "Nguyễn Văn Thu Ngân",
+        "role": "Nhân viên",
+        "created_at": "2026-10-17T08:14:07.601205"
+    },
+    {
+        "username": "minhtran",
+        "password_hash": "922d37cccc9881544a156f1041bfbc22$100000$76c4e3de37b50c2871e1eece88974d8b451b1f25b8157ebf16220ae190a9065c",
+        "full_name": "Tran Van Minh",
+        "role": "Thu ngân",
+        "created_at": "2026-10-17T08:21:24.897064"
+    },
+    {
+        "username": "Bduy",
+        "password_hash": "6277d918e4a250ad531c8c37ed6a7a75$100000$8611a23591f9ef3caa4a07570adb52d6ff546bea96325e8b1bcea484ea6da7fa",
+        "full_name": "Bảo Duy",
+        "role": "Đầu bếp",
+        "created_at": "2026-10-17T08:26:34.711947"
+    },
+    {
+        "username": "beptruong",
+        "password_hash": "1bf4ecd856cf1d80fef12b935062c7be$100000$e033880ff95f0d8108fb40f8af48ac1f39d2b6f46ed872761a41cd7140589a59",
+        "full_name": "Bep Truong Hai",
+        "role": "Đầu bếp",
+        "created_at": "2026-10-17T08:33:58.950917"
+    },
+    {
+        "username": "ngthai",
+        "password_hash": "624ba03acf005ec4ff56cb9f151c7907$100000$33186b870ca7afd57f5dd0cc5f38cde08589e4889cbf70ae6a0b44bdbf48e81f",
+        "full_name": "Nguyễn Thái",
+        "role": "Đầu bếp",
+        "created_at": "2026-10-17T08:37:56.789520"
+    },
+    {
+        "username": "fanta",
+        "password_hash": "1e7379706d8243ab5ff8b5f6f464ad52$100000$706e375dc1a5b569ffa541b50fa1dd445b46e4bc8de7f40f80e5f53c4875da14",
+        "full_name": "Fan Tá",
+        "role": "Nhân viên",
+        "created_at": "2026-10-17T08:38:30.002500"
+    },
+    {
+        "username": "baobao",
+        "password_hash": "5eddc23fde6b3ce3670a6e94391d295a$100000$7dc333d24d2801ddc4f3fcc67ca9e7fad1b34be9aa405f1997efa9aa55487433",
+        "full_name": "bảo bảo",
+        "role": "Thu ngân",
+        "created_at": "2026-10-17T08:39:24.390304"
+    },
+    {
+        "username": "tvn",
+        "password_hash": "a073afcf43859ac72203ea0f6b8ae6fb$100000$fb9b405c800cc86bf4d5370158cefd6d3ceb48cc1666a8e719d0ecb8080992bc",
+        "full_name": "tran van nam",
+        "role": "Quản lý",
+        "created_at": "2026-10-17T08:40:05.575047"
+    },
+    {
+        "username": "nhanvienvien",
+        "password_hash": "306ea3e42ff9b8fd255559b13b052579$100000$23608bbba83ae3245fb815186318c886c3c5b2c2593bcf0c8333dce227c7f3a7",
+        "full_name": "thang nhan vien",
+        "role": "Nhân viên",
+        "created_at": "2026-10-17T08:41:12.478461"
+    },
+    {
+        "username": "thaoo",
+        "password_hash": "68453c9dfd60a99ea594bdf347e61bcc$100000$47883f7c24b80d685e06f0d07cafd367da606fda1649e5d8a289519ea80bfe85",
+        "full_name": "Phạm  Thị Thu Thảo",
+        "role": "Quản lý",
+        "created_at": "2026-10-22T20:21:04.317829"
+    },
+    {
+        "username": "thaooo",
+        "password_hash": "6ea4a415f0aea0e2fe99665d4ff5efa1$100000$21eb6e7b6fb61e903b19065b0d664dc13a9ee2f39be436e04b6502412387b763",
+        "full_name": "Phạm  Thị Thu Thảo",
+        "role": "Quản lý",
+        "created_at": "2026-10-22T21:06:56.664267"
+    }
 ]

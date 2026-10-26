@@ -19,20 +19,21 @@ STATUS_LABELS = {
 
 
 def _render_create_order():
-    st.title("Tạo đơn hàng")
+    st.title("Tạo đơn hàng & Gọi thêm món")
     st.caption("Chọn bàn, thêm món và gửi đơn vào bếp")
     st.session_state.setdefault("cart", [])
     cart = st.session_state.cart
 
     order_service = st.session_state.order_service
     table_service = st.session_state.table_service
-    available_tables = table_service.available_tables()
+    
+    # Lấy tất cả danh sách bàn thay vì chỉ bàn trống để có thể gọi thêm món cho bàn đang phục vụ
+    tables_dict = table_service.list_tables()
+    table_options = list(tables_dict.keys())
+    
     active_menu = st.session_state.menu_service.list_items(only_active=True)
-    if not table_service.list_tables():
+    if not table_options:
         st.warning("Chưa có bàn. Hãy nhờ Quản lý thêm bàn trước khi tạo đơn hàng.")
-        return
-    if not available_tables:
-        st.warning("Tất cả bàn đang phục vụ. Hãy thanh toán hoặc huỷ đơn để mở lại bàn trống.")
         return
     if not active_menu:
         st.warning("Thực đơn đang trống hoặc chưa có món mở bán. Hãy thêm món trước.")
@@ -42,16 +43,24 @@ def _render_create_order():
     with col1:
         selected_table = st.session_state.get("selected_table")
         selected_index = (
-            available_tables.index(selected_table)
-            if selected_table in available_tables
+            table_options.index(selected_table)
+            if selected_table in table_options
             else 0
         )
         table = st.selectbox(
             "Bàn phục vụ",
-            available_tables,
+            table_options,
             index=selected_index,
             key="new_order_table",
         )
+        
+        # Hiển thị thông báo trạng thái bàn trực quan cho nhân viên
+        table_status = tables_dict.get(table, "Trống")
+        if table_status != "Trống":
+            st.info(f"ℹ️ **{table}** đang có khách. Khi thêm món, hệ thống sẽ **tự động cộng dồn** vào đơn hiện tại của bàn.")
+        else:
+            st.success(f"✅ **{table}** đang trống. Hệ thống sẽ tạo đơn mới.")
+
     with col2:
         menu_options = {
             f"{item.code} — {item.name} ({currency(item.price)})": item
@@ -106,8 +115,9 @@ def _render_create_order():
         return
     st.markdown(f"### Tạm tính: {currency(total_amount)}")
 
+    submit_button_text = "🚀 Gửi thêm món xuống bếp" if tables_dict.get(table) != "Trống" else "🚀 Xác nhận & Gửi đơn xuống bếp"
     if st.button(
-        "🚀 Xác nhận & Gửi đơn xuống bếp",
+        submit_button_text,
         type="primary",
         key="create_order_submit",
     ):
@@ -117,12 +127,12 @@ def _render_create_order():
             st.session_state.cart = []
             st.session_state.pop("selected_table", None)
             st.success(
-                f"Đã tạo thành công đơn hàng {order.order_id} cho {table} "
-                f"với tổng tiền {currency(order.total())}."
+                f"Đã cập nhật thành công đơn hàng {order.order_id} cho {table} "
+                f"với tổng tiền hiện tại {currency(order.total())}."
             )
             st.rerun()
         except ValueError as error:
-            st.error(f"Không thể tạo đơn hàng: {error}")
+            st.error(f"Không thể xử lý đơn hàng: {error}")
         except Exception as error:
             st.error(f"Đã xảy ra lỗi khi xử lý đơn hàng: {error}")
 
